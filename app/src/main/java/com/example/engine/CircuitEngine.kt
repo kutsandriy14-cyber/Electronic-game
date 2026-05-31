@@ -10,89 +10,90 @@ import com.example.model.Telemetry
 
 class CircuitEngine {
 
-    private fun canPassPower(component: GridComponent, fromX: Int, fromY: Int, toX: Int, toY: Int): Boolean {
-        val type = component.type
-        if (type == ComponentType.EMPTY || type == ComponentType.SWITCH_OPEN || type.category.name == "TOOLS") return false
-        
-        // Push button acts like an open switch until pressed (we'll assume they stay open unless handled specifically, normally they require active input, but we don't have mouse down. We can use logicState).
-        if (type == ComponentType.PUSH_BUTTON && !component.logicState) return false
-        
-        // Relays and Transistors only pass power if their logicState is true
-        if (type == ComponentType.RELAY && !component.logicState) return false
-        if (type == ComponentType.TRANSISTOR && !component.logicState) return false
-        
-        // Diode Logic: Allows flow only in the direction it points
-        if (type == ComponentType.DIODE) {
-            val dir = component.direction
-            // Determine direction of flow
-            if (fromX < toX && dir == Direction.RIGHT) return true
-            if (fromX > toX && dir == Direction.LEFT) return true
-            if (fromY < toY && dir == Direction.DOWN) return true
-            if (fromY > toY && dir == Direction.UP) return true
-            return false // Blocked
-        }
-        
-        return true
-    }
-
-    fun parseProps(data: String): Map<String, String> {
-        if (data.isBlank()) return emptyMap()
-        return data.split("|").mapNotNull { 
-            val parts = it.split("=")
-            if (parts.size == 2) parts[0] to parts[1] else null
-        }.toMap()
-    }
-
-    private fun runScripts(grid: Array<Array<GridComponent>>, width: Int, height: Int) {
+    private fun runScripts(grid: Array<Array<GridComponent>>, width: Int, height: Int): List<String> {
+        val logs = mutableListOf<String>()
+        val originalGrid = Array(width) { x -> Array(height) { y -> grid[x][y].copy() } }
         for (x in 0 until width) {
             for (y in 0 until height) {
                 val comp = grid[x][y]
                 if (comp.type == ComponentType.MICROCONTROLLER && comp.extraData.isNotEmpty()) {
-                    // Very simple parser for proof of concept
-                    // command format: out(pin, 1/0)
                     val lines = comp.extraData.split('\n')
                     for (line in lines) {
-                        val trimmed = line.trim()
-                        if (trimmed.startsWith("out(") && trimmed.endsWith(")")) {
-                            try {
-                                val args = trimmed.substring(4, trimmed.length - 1).split(",")
+                        var parsedLine = line.trim()
+                        if (parsedLine.isEmpty() || parsedLine.startsWith("--") || parsedLine.startsWith("//")) continue
+                        
+                        // Replace 'in(pin)' with '1' or '0'
+                        for (p in 0..3) {
+                            if (parsedLine.contains("in($p)")) {
+                                val nx = when(p) { 0 -> x; 1 -> x + 1; 2 -> x; 3 -> x - 1; else -> -1 }
+                                val ny = when(p) { 0 -> y - 1; 1 -> y; 2 -> y + 1; 3 -> y; else -> -1 }
+                                val v = if (nx in 0 until width && ny in 0 until height && originalGrid[nx][ny].logicState) "1" else "0"
+                                parsedLine = parsedLine.replace("in($p)", v)
+                            }
+                        }
+                        
+                        // Handle simple 'if ... then'
+                        var shouldExecute = true
+                        var commandPart = parsedLine
+                        
+                        if (parsedLine.startsWith("if")) {
+                            var cond = parsedLine.substringAfter("if").substringBefore("then")
+                            if (cond == parsedLine.substringAfter("if")) {
+                                cond = parsedLine.substringAfter("if").substringBefore("out")
+                            }
+                            cond = cond.trim()
+                            
+                            // Basic false condition check (like if 0, if false)
+                            // Evaluates simple equality `1 == 1` -> let's just cheat
+                            if (cond.contains("0 == 1") || cond.contains("1 == 0") || cond == "0" || cond == "false" || cond == "!1" || cond.contains("0==") || cond.contains("==0")) {
+                                shouldExecute = false
+                            }
+                            
+                            if (parsedLine.contains("then")) {
+                                commandPart = parsedLine.substringAfter("then").trim()
+                            } else if (parsedLine.contains("out(")) {
+                                commandPart = "out(" + parsedLine.substringAfter("out(")
+                            } else if (parsedLine.contains("log(")) {
+                                commandPart = "log(" + parsedLine.substringAfter("log(")
+                            }
+                        }
+                        
+                        if (shouldExecute) {
+                            if (commandPart.startsWith("log(")) {
+                                val msg = commandPart.substringAfter("log(").substringBeforeLast(")")
+                                logs.add("[MCU $x,$y]: $msg")
+                            } else if (commandPart.startsWith("out(")) {
+                                val outPart = commandPart.substringAfter("out(").substringBefore(")")
+                                val args = outPart.split(",")
                                 if (args.size == 2) {
                                     val pin = args[0].trim().toIntOrNull() ?: 0
-                                    val v = args[1].trim().toIntOrNull() ?: 0
+                                    // eval simple expression like '1' or '1 == 1'
+                                    val expr = args[1].trim()
+                                    val isHigh = expr == "1" || expr == "true" || expr == "1==1" || expr == "1 == 1"
                                     
                                     val nx = when(pin) { 0 -> x; 1 -> x + 1; 2 -> x; 3 -> x - 1; else -> -1 }
                                     val ny = when(pin) { 0 -> y - 1; 1 -> y; 2 -> y + 1; 3 -> y; else -> -1 }
                                     
                                     if (nx in 0 until width && ny in 0 until height) {
-                                        grid[nx][ny] = grid[nx][ny].copy(logicState = (v > 0))
+                                        grid[nx][ny] = grid[nx][ny].copy(logicState = isHigh)
                                     }
                                 }
-                            } catch (e: Exception) { }
+                            }
                         }
                     }
                 }
             }
         }
+        return logs
     }
 
     fun calculatePower(grid: Array<Array<GridComponent>>, width: Int, height: Int, tick: Long = 0): SimulationResult {
-        val powered = mutableSetOf<Pair<Int, Int>>()
-        val batteries = mutableListOf<Pair<Int, Int>>()
         var activeScriptsCount = 0
-        
-        var totalSources = 0
-        var totalLoads = 0
-        
-        var calculatedTotalVoltage = 0f
-        var calculatedTotalResistance = 1f // Base wire resistance
 
-        // Prep the grid for state changes this tick (like PULSE_GENERATOR)
-        val prepGrid = Array(width) { x ->
-            Array(height) { y ->
+        for (x in 0 until width) {
+            for (y in 0 until height) {
                 val comp = grid[x][y]
                 var newLogicState = comp.logicState
-                var newCharge = comp.charge
-                var newOverloaded = comp.isOverloaded
                 
                 if (comp.type == ComponentType.PULSE_GENERATOR) {
                     val rate = comp.extraData.toLongOrNull() ?: 1L // tick rate
@@ -101,204 +102,29 @@ class CircuitEngine {
                     }
                 }
                 
-                val props = parseProps(comp.extraData)
-                if (EnergyEngine.isPowerSource(comp.type)) {
-                     val maxV = props["v"]?.toFloatOrNull() ?: EnergyEngine.getDefaultVoltage(comp.type)
-                     val maxCharge = props["c"]?.toFloatOrNull() ?: EnergyEngine.getDefaultCapacity(comp.type)
-                     
-                     // Initialize charge
-                     if (newCharge == -1f) {
-                         newCharge = maxCharge
-                     }
-                     
-                     if (newCharge > 0 || comp.type == ComponentType.AC_SOURCE || comp.type == ComponentType.INFINITE_BATTERY) {
-                        val currentV = if (comp.type == ComponentType.AC_SOURCE || comp.type == ComponentType.INFINITE_BATTERY) maxV else maxV * (newCharge / maxCharge)
-                        if (currentV > 0.1f) {
-                            calculatedTotalVoltage += currentV
-                        } else {
-                            newCharge = 0f // Dead
-                        }
-                     }
-                }
-                if (comp.type == ComponentType.RESISTOR) {
-                     val r = props["r"]?.toFloatOrNull() ?: 330f
-                     calculatedTotalResistance += r
+                val newCharge = if (EnergyEngine.isPowerSource(comp.type) && comp.charge == -1f) {
+                     val props = EnergyEngine.parseProps(comp.extraData)
+                     props["c"]?.toFloatOrNull() ?: EnergyEngine.getDefaultCapacity(comp.type)
+                } else {
+                     comp.charge
                 }
                 
-                // CPU logic and memory load
-                if (comp.type == ComponentType.MICROCONTROLLER || comp.type == ComponentType.MEMORY_RAM || comp.type == ComponentType.MEMORY_ROM) {
-                     val cores = props["cores"]?.toIntOrNull() ?: 1
-                     val freq = props["mhz"]?.toFloatOrNull() ?: 16f
-                     val mem = props["mem_kb"]?.toIntOrNull() ?: 2
-                     
-                     // more cores / freq / mem = less resistance (higher current draw)
-                     val loadR = 1000f / (cores * (freq / 16f) * (mem / 2f).coerceAtLeast(1f))
-                     calculatedTotalResistance += loadR.coerceAtLeast(10f)
+                if (comp.logicState != newLogicState || comp.charge != newCharge) {
+                    grid[x][y] = comp.copy(logicState = newLogicState, charge = newCharge)
                 }
                 
-                comp.copy(logicState = newLogicState, charge = newCharge)
-            }
-        }
-        
-        runScripts(prepGrid, width, height)
-
-        for (x in 0 until width) {
-            for (y in 0 until height) {
-                val comp = prepGrid[x][y]
-                if (EnergyEngine.isPowerSource(comp.type)) {
-                    if (comp.type == ComponentType.AC_SOURCE || comp.type == ComponentType.GENERATOR || comp.type == ComponentType.SOLAR_PANEL || comp.type == ComponentType.WIND_TURBINE || comp.type == ComponentType.NUCLEAR_REACTOR || comp.type == ComponentType.GEOTHERMAL_GENERATOR || comp.type == ComponentType.HYDRO_GENERATOR || comp.type == ComponentType.THERMOELECTRIC_GENERATOR || comp.type == ComponentType.INFINITE_BATTERY || comp.charge > 0) {
-                        batteries.add(Pair(x, y))
-                        totalSources++
-                    }
-                } else if (comp.type == ComponentType.PULSE_GENERATOR && comp.logicState) {
-                    batteries.add(Pair(x, y)) // Acts as a source when high
-                    totalSources++
-                }
                 if (comp.type == ComponentType.MICROCONTROLLER && comp.extraData.isNotEmpty()) {
                     activeScriptsCount++
                 }
             }
         }
+        
+        val logs = runScripts(grid, width, height)
 
-        val queue = ArrayDeque<Pair<Int, Int>>()
-        queue.addAll(batteries)
-        
-        while (queue.isNotEmpty()) {
-            val curr = queue.removeFirst()
-            if(powered.contains(curr)) continue
-            
-            // Overloaded components break circuit
-            if(prepGrid[curr.first][curr.second].isOverloaded) continue
-            
-            powered.add(curr)
-            
-            val type = prepGrid[curr.first][curr.second].type
-            val extraProps = parseProps(prepGrid[curr.first][curr.second].extraData)
-            calculatedTotalResistance += EnergyEngine.addDynamicResistanceForComponent(type, extraProps)
-            
-            if (EnergyEngine.isLoad(type)) {
-                totalLoads++
-            }
+        val energyResult = EnergyEngine.simulateEnergyFlow(grid, width, height, activeScriptsCount)
+        PhysicsEngine.simulateMaterials(grid, width, height, energyResult.telemetry.totalVoltage)
 
-            val neighbors = listOf(
-                Pair(curr.first - 1, curr.second),
-                Pair(curr.first + 1, curr.second),
-                Pair(curr.first, curr.second - 1),
-                Pair(curr.first, curr.second + 1)
-            )
-            
-            for (n in neighbors) {
-                if (n.first in 0 until width && n.second in 0 until height) {
-                    val nComp = prepGrid[n.first][n.second]
-                    if (nComp.isOverloaded) continue // Skip broken elements
-                    
-                    // Special logic for switches/relays: they can only conduct if conditions match
-                    var canConduct = canPassPower(nComp, curr.first, curr.second, n.first, n.second)
-                    
-                    if (canConduct && !powered.contains(n)) {
-                        queue.add(n)
-                    }
-                }
-            }
-        }
-        
-        // --- Ohm's Law Simulation ---
-        // Rather than simple series addition which causes voltage to drop in half when connecting 2 loads,
-        // we'll approximate parallel loads: Total Current = Sum of individual load currents.
-        val voltage = calculatedTotalVoltage
-        var totalConductance = 0f // 1/R
-        
-        // Let's re-calculate conductance for the connected graph
-        for (p in powered) {
-             val comp = prepGrid[p.first][p.second]
-             val props = parseProps(comp.extraData)
-             val r = EnergyEngine.addDynamicResistanceForComponent(comp.type, props)
-             // Only add significant loads to conductance, wires are just wires
-             if (r > 5f) {
-                 totalConductance += 1f / r
-             }
-        }
-        
-        // Add globally static resistors to conductance
-        for (x in 0 until width) {
-            for (y in 0 until height) {
-                val comp = prepGrid[x][y]
-                if (comp.type == ComponentType.RESISTOR) {
-                     val r = parseProps(comp.extraData)["r"]?.toFloatOrNull() ?: 330f
-                     totalConductance += 1f / r
-                }
-                if (comp.type == ComponentType.MICROCONTROLLER || comp.type == ComponentType.MEMORY_RAM || comp.type == ComponentType.MEMORY_ROM) {
-                     val props = parseProps(comp.extraData)
-                     val cores = props["cores"]?.toIntOrNull() ?: 1
-                     val freq = props["mhz"]?.toFloatOrNull() ?: 16f
-                     val mem = props["mem_kb"]?.toIntOrNull() ?: 2
-                     val loadR = 1000f / (cores * (freq / 16f) * (mem / 2f).coerceAtLeast(1f))
-                     totalConductance += 1f / loadR.coerceAtLeast(10f)
-                }
-            }
-        }
-
-        // If nothing has resistance, default effective R is low (wire only), otherwise 1/Conductance
-        val effectiveR = if (totalConductance > 0f) (1f / totalConductance).coerceAtLeast(5f) else 5f
-        val resistance = effectiveR
-        
-        var current = 0f
-        var power = 0f
-        var shortCircuit = false
-        
-        if (totalSources > 0) {
-            current = (voltage / effectiveR) * 1000f // mA
-            
-            if (totalConductance == 0f && powered.size > totalSources) {
-                // Short circuit (only wires, no loads)
-                shortCircuit = true
-            }
-            power = voltage * (current / 1000f) // W = V * I(A)
-        }
-
-        // Final pass to update grid states based on power and handle overloads/drains
-        val newGrid = Array(width) { x ->
-            Array(height) { y ->
-                val wasPowered = powered.contains(Pair(x, y))
-                val comp = prepGrid[x][y]
-                
-                var finalLogicState = comp.logicState
-                var finalCharge = comp.charge
-                var finalOverloaded = comp.isOverloaded
-                
-                // Relays toggle when powered
-                if (comp.type == ComponentType.RELAY) {
-                     if (wasPowered) finalLogicState = true else finalLogicState = false
-                }
-                
-                // Wiring Overload Logic
-                if (wasPowered && current > 500000f) { // Raised safe current to 500A so components don't randomly burn for basic circuits
-                    val burnChance = (current - 500000f) / 1000000f
-                    if (Math.random() < burnChance) {
-                        finalOverloaded = true 
-                    }
-                }
-                
-                // Battery Drain
-                if (wasPowered && comp.charge > 0f) {
-                    if (comp.type == ComponentType.BATTERY || comp.type == ComponentType.BATTERY_PACK || comp.type == ComponentType.COIN_CELL) {
-                        // Realistic-ish drain, slow down significantly so it doesn't drain in 1 second
-                        val drainShare = if (totalSources > 0) current / totalSources else current
-                        val mA_drain = drainShare * 0.00005f 
-                        finalCharge = (comp.charge - mA_drain).coerceAtLeast(0f)
-                    }
-                }
-                
-                comp.copy(isPowered = wasPowered && !finalOverloaded, logicState = finalLogicState, charge = finalCharge, isOverloaded = finalOverloaded)
-            }
-        }
-        
-        // Apply Material and Physics Automata
-        PhysicsEngine.simulateMaterials(newGrid, width, height, voltage)
-
-        val telemetry = Telemetry(voltage, current, power, shortCircuit, activeScriptsCount)
-        
-        return SimulationResult(newGrid, telemetry)
+        return SimulationResult(grid, energyResult.telemetry, logs)
     }
 
     /* private fun simulateMaterials(grid: Array<Array<GridComponent>>, width: Int, height: Int, voltage: Float) {

@@ -6,17 +6,41 @@ import com.example.model.GridComponent
 
 object PhysicsEngine {
 
+    private var movedBuffer: Array<BooleanArray>? = null
+
+    private fun getMovedBuffer(width: Int, height: Int): Array<BooleanArray> {
+        val b = movedBuffer
+        if (b != null && b.size == width && b[0].size == height) {
+            for (x in 0 until width) {
+                for (y in 0 until height) {
+                    b[x][y] = false
+                }
+            }
+            return b
+        }
+        val newB = Array(width) { BooleanArray(height) }
+        movedBuffer = newB
+        return newB
+    }
+
     fun simulateMaterials(grid: Array<Array<GridComponent>>, width: Int, height: Int, voltage: Float) {
-        val moved = Array(width) { BooleanArray(height) }
+        val moved = getMovedBuffer(width, height)
         
         // Steam and Fire go up, gravity things go down
+        val dxs4 = intArrayOf(-1, 1, 0, 0)
+        val dys4 = intArrayOf(0, 0, -1, 1)
+
         // Iterate bottom-up for gravity
         for (y in height - 1 downTo 0) {
-            val xs = (0 until width).shuffled()
-            for (x in xs) {
-                if (moved[x][y]) continue
-                
-                val comp = grid[x][y]
+            val goRight = Math.random() < 0.5
+            val startX = if (goRight) 0 else width - 1
+            val endX = if (goRight) width - 1 else 0
+            val stepX = if (goRight) 1 else -1
+            
+            var x = startX
+            while (true) {
+                if (!moved[x][y]) {
+                    val comp = grid[x][y]
                 if (comp.type.category == ComponentCategory.MATERIALS && comp.type != ComponentType.GLASS && comp.type != ComponentType.STONE && comp.type != ComponentType.WOOD && comp.type != ComponentType.RUBBER && comp.type != ComponentType.DIAMOND && comp.type != ComponentType.COAL && comp.type != ComponentType.SPONGE && comp.type != ComponentType.URANIUM && comp.type != ComponentType.INFINITE_WATER && comp.type != ComponentType.INFINITE_LAVA && comp.type != ComponentType.VOID_HOLE && comp.type != ComponentType.FLUID_DRAIN && comp.type != ComponentType.STEEL && comp.type != ComponentType.COPPER && comp.type != ComponentType.GOLD && comp.type != ComponentType.ALUMINUM && comp.type != ComponentType.PLASTIC && comp.type != ComponentType.CLAY && comp.type != ComponentType.BRICK && comp.type != ComponentType.OBSIDIAN && comp.type != ComponentType.BEDROCK) {
                     
                     var newX = x
@@ -43,35 +67,42 @@ object PhysicsEngine {
                             moved[x][y] = true
                             continue
                         } else if (isFluid) {
-                            val dirs = listOf(-1, 1).shuffled()
+                            val goLeftFirst = Math.random() < 0.5
+                            val dir1 = if (goLeftFirst) -1 else 1
+                            val dir2 = if (goLeftFirst) 1 else -1
                             var sideMoved = false
-                            for (dx in dirs) {
-                                if (x + dx in 0 until width && grid[x + dx][y].type == ComponentType.EMPTY) {
-                                    newX = x + dx
-                                    didMove = true
-                                    sideMoved = true
-                                    break
-                                }
+                            if (x + dir1 in 0 until width && grid[x + dir1][y].type == ComponentType.EMPTY) {
+                                newX = x + dir1
+                                didMove = true
+                                sideMoved = true
+                            } else if (x + dir2 in 0 until width && grid[x + dir2][y].type == ComponentType.EMPTY) {
+                                newX = x + dir2
+                                didMove = true
+                                sideMoved = true
                             }
                             if (!sideMoved) {
-                                for (dx in dirs) {
-                                    if (x + dx in 0 until width && y + dirY in 0 until height && grid[x + dx][y + dirY].type == ComponentType.EMPTY) {
-                                        newX = x + dx
-                                        newY = y + dirY
-                                        didMove = true
-                                        break
-                                    }
+                                if (x + dir1 in 0 until width && y + dirY in 0 until height && grid[x + dir1][y + dirY].type == ComponentType.EMPTY) {
+                                    newX = x + dir1
+                                    newY = y + dirY
+                                    didMove = true
+                                } else if (x + dir2 in 0 until width && y + dirY in 0 until height && grid[x + dir2][y + dirY].type == ComponentType.EMPTY) {
+                                    newX = x + dir2
+                                    newY = y + dirY
+                                    didMove = true
                                 }
                             }
                         } else {
-                            val dirs = listOf(-1, 1).shuffled()
-                            for (dx in dirs) {
-                                if (x + dx in 0 until width && y + dirY in 0 until height && grid[x + dx][y + dirY].type == ComponentType.EMPTY) {
-                                    newX = x + dx
-                                    newY = y + dirY
-                                    didMove = true
-                                    break
-                                }
+                            val goLeftFirst = Math.random() < 0.5
+                            val dir1 = if (goLeftFirst) -1 else 1
+                            val dir2 = if (goLeftFirst) 1 else -1
+                            if (x + dir1 in 0 until width && y + dirY in 0 until height && grid[x + dir1][y + dirY].type == ComponentType.EMPTY) {
+                                newX = x + dir1
+                                newY = y + dirY
+                                didMove = true
+                            } else if (x + dir2 in 0 until width && y + dirY in 0 until height && grid[x + dir2][y + dirY].type == ComponentType.EMPTY) {
+                                newX = x + dir2
+                                newY = y + dirY
+                                didMove = true
                             }
                         }
                     }
@@ -160,6 +191,10 @@ object PhysicsEngine {
                         }
                     }
                 }
+                }
+                
+                if (x == endX) break
+                x += stepX
             }
         }
         
@@ -167,34 +202,46 @@ object PhysicsEngine {
         for (x in 0 until width) {
             for (y in 0 until height) {
                 val comp = grid[x][y]
-                val neighbors = listOf(Pair(x-1,y), Pair(x+1,y), Pair(x,y-1), Pair(x,y+1))
                 
                 // Generators
                 if (comp.type == ComponentType.INFINITE_WATER) {
-                    for (n in neighbors) if (n.first in 0 until width && n.second in 0 until height && grid[n.first][n.second].type == ComponentType.EMPTY && Math.random() < 0.2) grid[n.first][n.second] = GridComponent(ComponentType.WATER)
+                    for (i in 0..3) {
+                        val nx = x + dxs4[i]; val ny = y + dys4[i]
+                        if (nx in 0 until width && ny in 0 until height && grid[nx][ny].type == ComponentType.EMPTY && Math.random() < 0.2) grid[nx][ny] = GridComponent(ComponentType.WATER)
+                    }
                 } else if (comp.type == ComponentType.INFINITE_LAVA) {
-                    for (n in neighbors) if (n.first in 0 until width && n.second in 0 until height && grid[n.first][n.second].type == ComponentType.EMPTY && Math.random() < 0.1) grid[n.first][n.second] = GridComponent(ComponentType.LAVA)
+                    for (i in 0..3) {
+                        val nx = x + dxs4[i]; val ny = y + dys4[i]
+                        if (nx in 0 until width && ny in 0 until height && grid[nx][ny].type == ComponentType.EMPTY && Math.random() < 0.1) grid[nx][ny] = GridComponent(ComponentType.LAVA)
+                    }
                 } else if (comp.type == ComponentType.FLUID_DRAIN) {
-                    for (n in neighbors) if (n.first in 0 until width && n.second in 0 until height && grid[n.first][n.second].type.category == ComponentCategory.MATERIALS && grid[n.first][n.second].type != ComponentType.INFINITE_WATER && grid[n.first][n.second].type != ComponentType.INFINITE_LAVA && grid[n.first][n.second].type != ComponentType.VOID_HOLE) grid[n.first][n.second] = GridComponent(ComponentType.EMPTY)
+                    for (i in 0..3) {
+                        val nx = x + dxs4[i]; val ny = y + dys4[i]
+                        if (nx in 0 until width && ny in 0 until height && grid[nx][ny].type.category == ComponentCategory.MATERIALS && grid[nx][ny].type != ComponentType.INFINITE_WATER && grid[nx][ny].type != ComponentType.INFINITE_LAVA && grid[nx][ny].type != ComponentType.VOID_HOLE) grid[nx][ny] = GridComponent(ComponentType.EMPTY)
+                    }
                 } else if (comp.type == ComponentType.VOID_HOLE) {
-                    for (n in neighbors) if (n.first in 0 until width && n.second in 0 until height && grid[n.first][n.second].type != ComponentType.VOID_HOLE) grid[n.first][n.second] = GridComponent(ComponentType.EMPTY)
+                    for (i in 0..3) {
+                        val nx = x + dxs4[i]; val ny = y + dys4[i]
+                        if (nx in 0 until width && ny in 0 until height && grid[nx][ny].type != ComponentType.VOID_HOLE) grid[nx][ny] = GridComponent(ComponentType.EMPTY)
+                    }
                 } else if (comp.type == ComponentType.SPONGE) {
                     for (i in -3..3) for (j in -3..3) if (x+i in 0 until width && y+j in 0 until height && grid[x+i][y+j].type == ComponentType.WATER) grid[x+i][y+j] = GridComponent(ComponentType.EMPTY)
                 }
                 
                 // Reactions
                 if (comp.type == ComponentType.LAVA) {
-                    for (n in neighbors) {
-                        if (n.first in 0 until width && n.second in 0 until height) {
-                            val nType = grid[n.first][n.second].type
+                    for (i in 0..3) {
+                        val nx = x + dxs4[i]; val ny = y + dys4[i]
+                        if (nx in 0 until width && ny in 0 until height) {
+                            val nType = grid[nx][ny].type
                             if (nType == ComponentType.WATER) {
                                 grid[x][y] = GridComponent(ComponentType.STONE)
-                                grid[n.first][n.second] = GridComponent(ComponentType.STEAM)
+                                grid[nx][ny] = GridComponent(ComponentType.STEAM)
                                 break
                             } else if (nType == ComponentType.WOOD || nType == ComponentType.COAL || nType == ComponentType.OIL || nType == ComponentType.GASOLINE) {
-                                grid[n.first][n.second] = GridComponent(ComponentType.FIRE)
+                                grid[nx][ny] = GridComponent(ComponentType.FIRE)
                             } else if (nType == ComponentType.ICE) {
-                                grid[n.first][n.second] = GridComponent(ComponentType.WATER)
+                                grid[nx][ny] = GridComponent(ComponentType.WATER)
                                 grid[x][y] = GridComponent(ComponentType.STONE)
                             }
                         }
@@ -203,27 +250,29 @@ object PhysicsEngine {
                     if (Math.random() < 0.1) { 
                         grid[x][y] = GridComponent(ComponentType.EMPTY) // Fire dies eventually
                     } else {
-                        for (n in neighbors) {
-                            if (n.first in 0 until width && n.second in 0 until height) {
-                                val nType = grid[n.first][n.second].type
+                        for (i in 0..3) {
+                            val nx = x + dxs4[i]; val ny = y + dys4[i]
+                            if (nx in 0 until width && ny in 0 until height) {
+                                val nType = grid[nx][ny].type
                                 if (nType == ComponentType.WOOD || nType == ComponentType.COAL || nType == ComponentType.OIL || nType == ComponentType.GASOLINE) {
-                                    if (Math.random() < 0.2) grid[n.first][n.second] = GridComponent(ComponentType.FIRE)
+                                    if (Math.random() < 0.2) grid[nx][ny] = GridComponent(ComponentType.FIRE)
                                 } else if (nType == ComponentType.WATER) {
                                     grid[x][y] = GridComponent(ComponentType.STEAM)
                                 } else if (nType == ComponentType.ICE) {
-                                    grid[n.first][n.second] = GridComponent(ComponentType.WATER)
+                                    grid[nx][ny] = GridComponent(ComponentType.WATER)
                                     grid[x][y] = GridComponent(ComponentType.EMPTY)
                                 }
                             }
                         }
                     }
                 } else if (comp.type == ComponentType.ACID) {
-                    for (n in neighbors) {
-                        if (n.first in 0 until width && n.second in 0 until height) {
-                            val target = grid[n.first][n.second]
+                    for (i in 0..3) {
+                        val nx = x + dxs4[i]; val ny = y + dys4[i]
+                        if (nx in 0 until width && ny in 0 until height) {
+                            val target = grid[nx][ny]
                             if (target.type != ComponentType.EMPTY && target.type != ComponentType.ACID && target.type != ComponentType.GLASS && target.type != ComponentType.DIAMOND && target.type != ComponentType.VOID_HOLE) {
                                 if (Math.random() < 0.1) {
-                                    grid[n.first][n.second] = GridComponent(ComponentType.ACID)
+                                    grid[nx][ny] = GridComponent(ComponentType.ACID)
                                     grid[x][y] = GridComponent(ComponentType.EMPTY)
                                     break
                                 }
@@ -232,11 +281,12 @@ object PhysicsEngine {
                     }
                 } else if (comp.type == ComponentType.LIQUID_NITROGEN) {
                     if (Math.random() < 0.2) grid[x][y] = GridComponent(ComponentType.EMPTY) // Evaporates
-                    for (n in neighbors) {
-                        if (n.first in 0 until width && n.second in 0 until height) {
-                            val nType = grid[n.first][n.second].type
-                            if (nType == ComponentType.WATER) grid[n.first][n.second] = GridComponent(ComponentType.ICE)
-                            if (nType == ComponentType.FIRE) grid[n.first][n.second] = GridComponent(ComponentType.EMPTY)
+                    for (i in 0..3) {
+                        val nx = x + dxs4[i]; val ny = y + dys4[i]
+                        if (nx in 0 until width && ny in 0 until height) {
+                            val nType = grid[nx][ny].type
+                            if (nType == ComponentType.WATER) grid[nx][ny] = GridComponent(ComponentType.ICE)
+                            if (nType == ComponentType.FIRE) grid[nx][ny] = GridComponent(ComponentType.EMPTY)
                         }
                     }
                 } else if (comp.type == ComponentType.STEAM) {
@@ -244,19 +294,52 @@ object PhysicsEngine {
                     else if (Math.random() < 0.05) grid[x][y] = GridComponent(ComponentType.EMPTY) // Dissipate
                 }
                 
+                // Nuclear Reactor logic
+                if (comp.type == ComponentType.NUCLEAR_REACTOR) {
+                    var hasWater = false
+                    var hasUranium = false
+                    for (i in 0..3) {
+                        val nx = x + dxs4[i]; val ny = y + dys4[i]
+                        if (nx in 0 until width && ny in 0 until height) {
+                            if (grid[nx][ny].type == ComponentType.WATER) hasWater = true
+                            if (grid[nx][ny].type == ComponentType.URANIUM) hasUranium = true
+                        }
+                    }
+                    if (hasWater && hasUranium) {
+                        // Consume water, make steam, consume uranium slowly
+                        for (i in 0..3) {
+                            val nx = x + dxs4[i]; val ny = y + dys4[i]
+                            if (nx in 0 until width && ny in 0 until height) {
+                                if (grid[nx][ny].type == ComponentType.WATER && Math.random() < 0.3) {
+                                    grid[nx][ny] = GridComponent(ComponentType.STEAM)
+                                }
+                                if (grid[nx][ny].type == ComponentType.URANIUM && Math.random() < 0.01) {
+                                    grid[nx][ny] = GridComponent(ComponentType.EMPTY) 
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 // Component Interactions (Powered Heaters, Coolers)
                 if (comp.isPowered && comp.type == ComponentType.HEATER) {
-                    for (n in neighbors) if (n.first in 0 until width && n.second in 0 until height) {
-                        val nt = grid[n.first][n.second].type
-                        if (nt == ComponentType.WATER) grid[n.first][n.second] = GridComponent(ComponentType.STEAM)
-                        if (nt == ComponentType.ICE) grid[n.first][n.second] = GridComponent(ComponentType.WATER)
+                    for (i in 0..3) {
+                        val nx = x + dxs4[i]; val ny = y + dys4[i]
+                        if (nx in 0 until width && ny in 0 until height) {
+                            val nt = grid[nx][ny].type
+                            if (nt == ComponentType.WATER) grid[nx][ny] = GridComponent(ComponentType.STEAM)
+                            if (nt == ComponentType.ICE) grid[nx][ny] = GridComponent(ComponentType.WATER)
+                        }
                     }
                 }
                 if (comp.isPowered && comp.type == ComponentType.COOLER) {
-                    for (n in neighbors) if (n.first in 0 until width && n.second in 0 until height) {
-                        val nt = grid[n.first][n.second].type
-                        if (nt == ComponentType.WATER) grid[n.first][n.second] = GridComponent(ComponentType.ICE)
-                        if (nt == ComponentType.STEAM) grid[n.first][n.second] = GridComponent(ComponentType.WATER)
+                    for (i in 0..3) {
+                        val nx = x + dxs4[i]; val ny = y + dys4[i]
+                        if (nx in 0 until width && ny in 0 until height) {
+                            val nt = grid[nx][ny].type
+                            if (nt == ComponentType.WATER) grid[nx][ny] = GridComponent(ComponentType.ICE)
+                            if (nt == ComponentType.STEAM) grid[nx][ny] = GridComponent(ComponentType.WATER)
+                        }
                     }
                 }
                 

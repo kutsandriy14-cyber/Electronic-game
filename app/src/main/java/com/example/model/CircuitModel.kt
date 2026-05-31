@@ -18,6 +18,7 @@ enum class ComponentType(val category: ComponentCategory) {
     PAN(ComponentCategory.TOOLS), 
     ROTATE(ComponentCategory.TOOLS), 
     INSPECT(ComponentCategory.TOOLS),
+    MULTIMETER(ComponentCategory.TOOLS),
 
     BATTERY(ComponentCategory.POWER), 
     BATTERY_PACK(ComponentCategory.POWER),
@@ -87,6 +88,7 @@ enum class ComponentType(val category: ComponentCategory) {
     FAN(ComponentCategory.OUTPUTS),
     MONITOR_OLED(ComponentCategory.OUTPUTS),
     CRT_MONITOR(ComponentCategory.OUTPUTS),
+    DISPLAY_PIXEL(ComponentCategory.OUTPUTS),
     
     LOGIC_AND(ComponentCategory.LOGIC), 
     LOGIC_OR(ComponentCategory.LOGIC), 
@@ -159,13 +161,6 @@ enum class ComponentType(val category: ComponentCategory) {
     JOYSTICK(ComponentCategory.SWITCHES),
     ENCODER(ComponentCategory.SWITCHES),
     
-    ANTENNA_TX(ComponentCategory.ADVANCED),
-    ANTENNA_RX(ComponentCategory.ADVANCED),
-    WIFI_MODULE(ComponentCategory.ADVANCED),
-    BLUETOOTH_MODULE(ComponentCategory.ADVANCED),
-    RADIO_AM(ComponentCategory.ADVANCED),
-    RADIO_FM(ComponentCategory.ADVANCED),
-    
     STEP_DOWN_CONVERTER(ComponentCategory.POWER),
     STEP_UP_CONVERTER(ComponentCategory.POWER),
     INVERTER(ComponentCategory.POWER),
@@ -207,12 +202,6 @@ enum class ComponentType(val category: ComponentCategory) {
     IC_L298N_MOTOR(ComponentCategory.ANALOG_ICS),
     IC_ULN2003(ComponentCategory.ANALOG_ICS),
     
-    ARDUINO_UNO(ComponentCategory.ADVANCED),
-    ARDUINO_NANO(ComponentCategory.ADVANCED),
-    ESP32(ComponentCategory.ADVANCED),
-    ESP8266(ComponentCategory.ADVANCED),
-    RASPBERRY_PI_PICO(ComponentCategory.ADVANCED),
-    
     STEEL(ComponentCategory.MATERIALS),
     COPPER(ComponentCategory.MATERIALS),
     GOLD(ComponentCategory.MATERIALS),
@@ -251,6 +240,7 @@ data class Telemetry(
 
 data class SimulationResult(
     val grid: Array<Array<GridComponent>>,
-    val telemetry: Telemetry
+    val telemetry: Telemetry,
+    val logs: List<String> = emptyList()
 )
 

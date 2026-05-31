@@ -155,6 +155,13 @@ object RenderEngine {
                     drawLine(color, start = Offset(cx, cellSize * 0.85f), end = Offset(cx, cellSize), strokeWidth = strokeSize)
                 }
 
+                ComponentType.DISPLAY_PIXEL -> {
+                    val pixelColor = if (component.isPowered) Color.White else Color(0xFF111111)
+                    val glow = if (component.isPowered) Color(0x33FFFFFF) else Color.Transparent
+                    drawRect(glow, topLeft = Offset(0f, 0f), size = Size(cellSize, cellSize))
+                    drawRect(pixelColor, topLeft = Offset(cellSize * 0.1f, cellSize * 0.1f), size = Size(cellSize * 0.8f, cellSize * 0.8f))
+                }
+                
                 ComponentType.LED -> {
                     val ledColor = if (component.isPowered) Color(0xFFFF3366) else Color(0xFF4A1020)
                     if (component.isPowered) drawCircle(ledColor.copy(alpha = 0.6f), radius = cellSize * 0.4f, center = Offset(cx, cy))

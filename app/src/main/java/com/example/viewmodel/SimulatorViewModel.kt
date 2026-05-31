@@ -30,7 +30,9 @@ data class SimulatorState(
     val showLoadDialog: Boolean = false,
     val showSaveDialog: Boolean = false,
     val showSettingsDialog: Boolean = false,
+    val logs: List<String> = emptyList(), // For SSM scripts logs
     val inspectCoordinates: Pair<Int, Int>? = null, // Open inspect dialog for this cell
+    val multimeterCoordinates: Pair<Int, Int>? = null, // Open multimeter tooltip for this cell
     val isEasterEggActive: Boolean = false,
     val isSimulationRunning: Boolean = true,
     val simulationTick: Long = 0
@@ -41,19 +43,22 @@ data class SimulatorState(
 
         other as SimulatorState
 
-        if (!grid.contentDeepEquals(other.grid)) return false
+        if (simulationTick != other.simulationTick) return false
+        if (isSimulationRunning != other.isSimulationRunning) return false
+        if (selectedTool != other.selectedTool) return false
+        if (selectedCategory != other.selectedCategory) return false
         if (width != other.width) return false
         if (height != other.height) return false
         if (telemetry != other.telemetry) return false
-        if (selectedTool != other.selectedTool) return false
-        if (selectedCategory != other.selectedCategory) return false
         if (showLoadDialog != other.showLoadDialog) return false
         if (showSaveDialog != other.showSaveDialog) return false
         if (showSettingsDialog != other.showSettingsDialog) return false
         if (inspectCoordinates != other.inspectCoordinates) return false
+        if (multimeterCoordinates != other.multimeterCoordinates) return false
         if (isEasterEggActive != other.isEasterEggActive) return false
-        if (isSimulationRunning != other.isSimulationRunning) return false
-        if (simulationTick != other.simulationTick) return false
+        
+        // Deep equals last because it is very expensive
+        if (!grid.contentDeepEquals(other.grid)) return false
 
         return true
     }
@@ -69,6 +74,7 @@ data class SimulatorState(
         result = 31 * result + showSaveDialog.hashCode()
         result = 31 * result + showSettingsDialog.hashCode()
         result = 31 * result + (inspectCoordinates?.hashCode() ?: 0)
+        result = 31 * result + (multimeterCoordinates?.hashCode() ?: 0)
         result = 31 * result + isEasterEggActive.hashCode()
         result = 31 * result + isSimulationRunning.hashCode()
         result = 31 * result + simulationTick.hashCode()
@@ -93,11 +99,42 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
 
     init {
         startSimulationLoop()
+        startAutoSaveLoop()
+    }
+
+    private fun startAutoSaveLoop() {
+        viewModelScope.launch(Dispatchers.IO) {
+            while (true) {
+                delay(30000) // Auto-save every 30 seconds
+                val state = _uiState.value
+                val data = engine.serializeGrid(state.grid, state.width, state.height)
+                try {
+                    // Save as AutoSave
+                    repository.insert(com.example.db.CircuitScheme(
+                        name = "AutoSave",
+                        gridData = data,
+                        width = state.width,
+                        height = state.height
+                    ))
+                } catch (e: Exception) {
+                }
+            }
+        }
     }
 
     fun getShareableString(): String {
         val state = _uiState.value
-        return engine.serializeGrid(state.grid, state.width, state.height)
+        return "esshim://" + engine.serializeGrid(state.grid, state.width, state.height)
+    }
+
+    fun importShareableString(data: String) {
+        try {
+            val actualData = if (data.startsWith("esshim://")) data.substring(9) else data
+            val newGrid = engine.deserializeGrid(actualData, _uiState.value.width, _uiState.value.height)
+            _uiState.update { it.copy(grid = newGrid, showSettingsDialog = false) }
+        } catch (e: Exception) {
+            // ignore
+        }
     }
 
     private fun startSimulationLoop() {
@@ -110,6 +147,7 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
                         it.copy(
                             grid = simResult.grid, 
                             telemetry = simResult.telemetry,
+                            logs = if (simResult.logs.isNotEmpty()) (it.logs + simResult.logs).takeLast(50) else it.logs,
                             simulationTick = it.simulationTick + 1
                         ) 
                     }
@@ -148,6 +186,16 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
             val comp = currentState.grid[x][y]
             if (comp.type != ComponentType.EMPTY) {
                 _uiState.update { it.copy(inspectCoordinates = Pair(x, y)) }
+            }
+            return
+        }
+        
+        if (tool == ComponentType.MULTIMETER) {
+            val comp = currentState.grid[x][y]
+            if (comp.type != ComponentType.EMPTY) {
+                _uiState.update { it.copy(multimeterCoordinates = Pair(x, y)) }
+            } else {
+                _uiState.update { it.copy(multimeterCoordinates = null) }
             }
             return
         }
@@ -221,6 +269,10 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
     
     fun dismissInspect() {
         _uiState.update { it.copy(inspectCoordinates = null) }
+    }
+    
+    fun dismissMultimeter() {
+        _uiState.update { it.copy(multimeterCoordinates = null) }
     }
     
     fun dismissEasterEgg() {

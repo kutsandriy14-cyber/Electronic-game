@@ -61,6 +61,7 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
             grid = state.grid,
             width = state.width,
             height = state.height,
+            tick = state.simulationTick,
             selectedTool = state.selectedTool,
             onCellClicked = { x, y -> viewModel.onCellClicked(x, y) }
         )
@@ -85,9 +86,30 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
             IconButton(onClick = { viewModel.showSettingsDialog() }) { Icon(Icons.Default.Settings, "Settings", tint = Color.White) }
         }
 
-        // Left Telemetry Overlay
-        Box(modifier = Modifier.align(Alignment.TopStart).padding(top = 88.dp, start = 16.dp)) {
-            TelemetryWidget(state.telemetry)
+        // Logs Overlay
+        if (state.logs.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 80.dp, start = 16.dp)
+                    .width(220.dp)
+                    .height(200.dp)
+                    .background(Color(0xD2121215), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .border(1.dp, Color(0x3300FFCC), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .padding(8.dp)
+            ) {
+                val scrollState = rememberScrollState()
+                LaunchedEffect(state.logs.size) {
+                    scrollState.scrollTo(scrollState.maxValue)
+                }
+                Column(modifier = Modifier.verticalScroll(scrollState)) {
+                    Text("MCU LOGS (SSM)", fontSize = 10.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    state.logs.forEach { logMsg ->
+                        Text(logMsg, fontSize = 9.sp, color = Color(0xFFCCCCCC), fontFamily = FontFamily.Monospace, lineHeight = 12.sp)
+                    }
+                }
+            }
         }
 
         // Bottom Toolbox Overlay
@@ -110,13 +132,22 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
 
         if (state.showSaveDialog) SaveDialog({ viewModel.dismissDialogs() }, { name -> viewModel.saveScheme(name) })
         if (state.showLoadDialog) LoadDialog(savedSchemes, { viewModel.dismissDialogs() }, { scheme -> viewModel.loadScheme(scheme) }, { id -> viewModel.deleteScheme(id) })
-        if (state.showSettingsDialog) SettingsDialog({ viewModel.dismissDialogs() }, { w, h -> viewModel.resizeGrid(w, h) })
+        if (state.showSettingsDialog) SettingsDialog({ viewModel.dismissDialogs() }, { w, h -> viewModel.resizeGrid(w, h) }, { viewModel.getShareableString() }, { viewModel.importShareableString(it) })
         state.inspectCoordinates?.let { coords ->
             val comp = state.grid[coords.first][coords.second]
             InspectDialog(
                 component = comp,
                 onDismiss = { viewModel.dismissInspect() },
                 onSave = { data, repair -> viewModel.updateComponentData(coords.first, coords.second, data, repair) }
+            )
+        }
+        
+        state.multimeterCoordinates?.let { coords ->
+            val comp = state.grid[coords.first][coords.second]
+            MultimeterDialog(
+                component = comp,
+                coords = coords,
+                onDismiss = { viewModel.dismissMultimeter() }
             )
         }
         
@@ -132,49 +163,51 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
 }
 
 @Composable
-fun TelemetryWidget(telemetry: Telemetry) {
-    Box(
-        modifier = Modifier
-            .background(Color(0xD2121215), shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-            .border(1.dp, Color(0x3300FFCC), androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-            .padding(16.dp)
-    ) {
-        Column {
-            Text("LIVE TELEMETRY", fontSize = 10.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column {
-                    Text("Current", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(String.format(Locale.US, "%.1f", telemetry.totalCurrent), fontSize = 20.sp, color = Color.White, fontFamily = FontFamily.Monospace)
-                        Text("mA", fontSize = 12.sp, color = Color(0xFF00FFCC), modifier = Modifier.padding(start = 2.dp, bottom = 3.dp))
+fun MultimeterDialog(component: GridComponent, coords: Pair<Int, Int>, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("MULTIMETER", style = MaterialTheme.typography.titleMedium, color = Color(0xFF00BCD4), letterSpacing = 2.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text("Component: ${component.type.name}", style = MaterialTheme.typography.bodyLarge)
+                Text("Position: X: ${coords.first} Y: ${coords.second}", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (component.type == ComponentType.EMPTY) {
+                   Text("Empty space", style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Column {
+                            Text("Power State", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            Text(if (component.isPowered) "POWERED" else "OFF", style = MaterialTheme.typography.bodyLarge, color = if (component.isPowered) Color(0xFF4CAF50) else Color(0xFFE53935))
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Logic State", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            Text(if (component.logicState) "HIGH (1)" else "LOW (0)", style = MaterialTheme.typography.bodyLarge, color = if (component.logicState) Color(0xFF2196F3) else Color(0xFF9E9E9E))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Charge / Fuel", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    LinearProgressIndicator(
+                        progress = { if (component.charge > 0) 1f else 0f },
+                        modifier = Modifier.fillMaxWidth().height(8.dp),
+                    )
+                    Text("${component.charge}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    
+                    if (component.isOverloaded) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Overloaded! Needs repair.", style = MaterialTheme.typography.bodyLarge, color = Color(0xFFE53935), fontWeight = FontWeight.Bold)
                     }
                 }
-                Spacer(Modifier.width(16.dp))
-                Box(Modifier.width(1.dp).height(36.dp).background(Color(0x33FFFFFF)))
-                Spacer(Modifier.width(16.dp))
-                Column {
-                    Text("Power", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(String.format(Locale.US, "%.2f", telemetry.totalPower), fontSize = 18.sp, color = Color.White, fontFamily = FontFamily.Monospace)
-                        Text("W", fontSize = 12.sp, color = Color(0xFF00FFCC), modifier = Modifier.padding(start = 2.dp, bottom = 2.dp))
-                    }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = onDismiss) { Text("Close") }
                 }
-                Spacer(Modifier.width(12.dp))
-                Box(Modifier.width(1.dp).height(30.dp).background(Color(0x55FFFFFF)))
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("Voltage", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(String.format(Locale.US, "%.1f", telemetry.totalVoltage), fontSize = 18.sp, color = Color.White, fontFamily = FontFamily.Monospace)
-                        Text("V", fontSize = 12.sp, color = Color(0xFF00FFCC), modifier = Modifier.padding(start = 2.dp, bottom = 2.dp))
-                    }
-                }
-            }
-            if (telemetry.runningScripts > 0) {
-                 Text("LUA SCRIPTS: ${telemetry.runningScripts} ACTIVE", color = Color(0xFF00FFCC), fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-            }
-            if (telemetry.isShortCircuit) {
-                Text("SHORT CIRCUIT DETECTED!", color = Color(0xFFFF3B30), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
             }
         }
     }
@@ -185,6 +218,7 @@ fun CircuitGridCanvas(
     grid: Array<Array<GridComponent>>,
     width: Int,
     height: Int,
+    tick: Long,
     selectedTool: ComponentType,
     onCellClicked: (Int, Int) -> Unit
 ) {
@@ -892,6 +926,7 @@ fun getIconForType(type: ComponentType): ImageVector {
         ComponentType.PAN -> Icons.Default.PanTool
         ComponentType.ROTATE -> Icons.Default.RotateRight
         ComponentType.INSPECT -> Icons.Default.Code
+        ComponentType.MULTIMETER -> Icons.Default.Speed
         ComponentType.EMPTY -> Icons.Default.Backspace
         ComponentType.BATTERY, ComponentType.INFINITE_BATTERY -> Icons.Default.BatteryChargingFull
         ComponentType.BATTERY_PACK -> Icons.Default.BatteryFull
@@ -1056,7 +1091,7 @@ fun InspectDialog(component: GridComponent, onDismiss: () -> Unit, onSave: (Stri
                         onValueChange = { textData = it },
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                         textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
-                        placeholder = { Text("Example: cores=2|mhz=16|mem_kb=1024\n\n-- Script engine (Basic)\n-- Write: out(pin, val)\n-- Pin: 0(Top) 1(Right) 2(Bot) 3(Left)\n-- Val: 1 (High) or 0 (Low)\n\nout(1, 1)") }
+                        placeholder = { Text("Example: cores=2|mhz=16|mem_kb=1024\n\n-- SSM Script engine\n-- out(pin, val)\n-- Pin: 0(Top) 1(Right) 2(Bot) 3(Left)\n-- log(Hello World)\n-- if in(0) == 1 then out(1, 1)\n\nif 1==1 then log(Started)\nout(1, 1)") }
                     )
                 } else if (component.type == ComponentType.MEMORY_RAM || component.type == ComponentType.MEMORY_ROM) {
                     Text("Memory Tuning", style = MaterialTheme.typography.labelMedium)
@@ -1122,14 +1157,67 @@ fun InspectDialog(component: GridComponent, onDismiss: () -> Unit, onSave: (Stri
 
 // Dialogs 
 @Composable
-fun SettingsDialog(onDismiss: () -> Unit, onResize: (Int, Int) -> Unit) {
+fun SettingsDialog(onDismiss: () -> Unit, onResize: (Int, Int) -> Unit, exportScheme: () -> String, importScheme: (String) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    
+    val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        uri?.let {
+            try {
+                context.contentResolver.openOutputStream(it)?.use { out ->
+                    out.write(exportScheme().toByteArray())
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            try {
+                context.contentResolver.openInputStream(it)?.use { input ->
+                    val text = input.bufferedReader().use { reader -> reader.readText() }
+                    importScheme(text)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Simulator Settings") },
+        title = { Text("Settings", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text("Select Workspace Size. Warning: Resizing will completely clear your current circuit!", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Project Integration", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = { 
+                    exportLauncher.launch("blueprint.esshim")
+                }, modifier = Modifier.fillMaxWidth()) { 
+                    Icon(Icons.Default.UploadFile, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Export to .esshim file") 
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = { 
+                    importLauncher.launch(arrayOf("*/*"))
+                }, modifier = Modifier.fillMaxWidth()) { 
+                    Icon(Icons.Default.Download, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Import .esshim file") 
+                }
+                Spacer(Modifier.height(24.dp))
+                
+                Text("Workspace Setup", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
+                Spacer(Modifier.height(4.dp))
+                Text("Warning: Resizing clears your current circuit!", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.height(16.dp))
+                
                 Button(onClick = { onResize(8, 8) }, modifier = Modifier.fillMaxWidth()) { Text("Small Prototype (8x8)") }
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = { onResize(16, 16) }, modifier = Modifier.fillMaxWidth()) { Text("Mobile Standard (16x16)") }
@@ -1138,14 +1226,14 @@ fun SettingsDialog(onDismiss: () -> Unit, onResize: (Int, Int) -> Unit) {
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = { onResize(64, 64) }, modifier = Modifier.fillMaxWidth()) { Text("Massive Blueprint (64x64)") }
                 Spacer(Modifier.height(8.dp))
-                Button(onClick = { onResize(128, 128) }, modifier = Modifier.fillMaxWidth()) { Text("Motherboard Level 1 (128x128)") }
+                Button(onClick = { onResize(128, 128) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Motherboard Level 1 (128x128)") }
                 Spacer(Modifier.height(8.dp))
-                Button(onClick = { onResize(256, 256) }, modifier = Modifier.fillMaxWidth()) { Text("Motherboard Level 2 (256x256)") }
+                Button(onClick = { onResize(256, 256) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Motherboard Level 2 (256x256)") }
                 Spacer(Modifier.height(8.dp))
-                Button(onClick = { onResize(512, 512) }, modifier = Modifier.fillMaxWidth()) { Text("City Grid Level (512x512)") }
+                Button(onClick = { onResize(512, 512) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("City Grid Level (512x512)") }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
     )
 }
 
