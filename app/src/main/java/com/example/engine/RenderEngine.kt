@@ -436,8 +436,22 @@ object RenderEngine {
                             ComponentType.SPONGE -> Color(0xFFFFEB3B)
                             ComponentType.GASOLINE -> Color(0xAAFFC107)
                             ComponentType.LIQUID_NITROGEN -> Color(0xAA4DD0E1)
-                            ComponentType.URANIUM -> Color(0xAA76FF03)
+                            ComponentType.URANIUM -> {
+                                val temp = component.temperature
+                                if (temp <= 100f) {
+                                    Color(0xAA76FF03)
+                                } else if (temp < 600f) {
+                                    val r = (((temp - 100f) / 500f) * 255f).toInt().coerceIn(0, 255)
+                                    val g = (255 - (((temp - 100f) / 500f) * 150f)).toInt().coerceIn(0, 255)
+                                    Color(r, g, 3, 230)
+                                } else {
+                                    val green = ((((temp - 600f) / 1400f) * 255f) + 105f).toInt().coerceIn(105, 255)
+                                    val blue = (((temp - 600f) / 1400f) * 255f).toInt().coerceIn(0, 255)
+                                    Color(255, green, blue, 255)
+                                }
+                            }
                             ComponentType.MAGIC_DUST -> Color(0xAAE040FB)
+                            ComponentType.PIPE -> Color(0xFF546E7A)
                             ComponentType.FLUID_DRAIN, ComponentType.VOID_HOLE -> Color(0xFF000000)
                             
                             ComponentType.STEEL -> Color(0xFFB0BEC5)
@@ -462,6 +476,33 @@ object RenderEngine {
                             drawRect(shine, size = Size(cellSize, cellSize))
                         } else if (component.type == ComponentType.DIAMOND) {
                             drawLine(Color.White, start = Offset(cellSize*0.2f, 0f), end = Offset(cellSize, cellSize*0.8f), strokeWidth = 1.5f)
+                        } else if (component.type == ComponentType.PIPE) {
+                            val arrowColor = Color(0xFF00E676)
+                            // Draw inner channel
+                            drawRect(Color(0xFF263238), topLeft = Offset(cellSize*0.2f, cellSize*0.2f), size = Size(cellSize*0.6f, cellSize*0.6f))
+                            // Draw flow direction indicator
+                            when (component.direction) {
+                                Direction.RIGHT -> {
+                                    drawLine(arrowColor, start = Offset(cellSize*0.2f, cy), end = Offset(cellSize*0.8f, cy), strokeWidth = 4f)
+                                    drawLine(arrowColor, start = Offset(cellSize*0.8f, cy), end = Offset(cellSize*0.5f, cy - cellSize*0.2f), strokeWidth = 4f)
+                                    drawLine(arrowColor, start = Offset(cellSize*0.8f, cy), end = Offset(cellSize*0.5f, cy + cellSize*0.2f), strokeWidth = 4f)
+                                }
+                                Direction.LEFT -> {
+                                    drawLine(arrowColor, start = Offset(cellSize*0.8f, cy), end = Offset(cellSize*0.2f, cy), strokeWidth = 4f)
+                                    drawLine(arrowColor, start = Offset(cellSize*0.2f, cy), end = Offset(cellSize*0.5f, cy - cellSize*0.2f), strokeWidth = 4f)
+                                    drawLine(arrowColor, start = Offset(cellSize*0.2f, cy), end = Offset(cellSize*0.5f, cy + cellSize*0.2f), strokeWidth = 4f)
+                                }
+                                Direction.UP -> {
+                                    drawLine(arrowColor, start = Offset(cx, cellSize*0.8f), end = Offset(cx, cellSize*0.2f), strokeWidth = 4f)
+                                    drawLine(arrowColor, start = Offset(cx, cellSize*0.2f), end = Offset(cx - cellSize*0.2f, cellSize*0.5f), strokeWidth = 4f)
+                                    drawLine(arrowColor, start = Offset(cx, cellSize*0.2f), end = Offset(cx + cellSize*0.2f, cellSize*0.5f), strokeWidth = 4f)
+                                }
+                                Direction.DOWN -> {
+                                    drawLine(arrowColor, start = Offset(cx, cellSize*0.2f), end = Offset(cx, cellSize*0.8f), strokeWidth = 4f)
+                                    drawLine(arrowColor, start = Offset(cx, cellSize*0.8f), end = Offset(cx - cellSize*0.2f, cellSize*0.5f), strokeWidth = 4f)
+                                    drawLine(arrowColor, start = Offset(cx, cellSize*0.8f), end = Offset(cx + cellSize*0.2f, cellSize*0.5f), strokeWidth = 4f)
+                                }
+                            }
                         }
                         if (component.type == ComponentType.INFINITE_WATER || component.type == ComponentType.INFINITE_LAVA) {
                             drawRect(Color.White, topLeft = Offset(padding*2, padding*2), size = Size(cellSize - padding*4, cellSize - padding*4))

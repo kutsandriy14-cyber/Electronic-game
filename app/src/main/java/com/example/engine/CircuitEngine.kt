@@ -87,7 +87,8 @@ class CircuitEngine {
         return logs
     }
 
-    fun calculatePower(grid: Array<Array<GridComponent>>, width: Int, height: Int, tick: Long = 0): SimulationResult {
+    fun calculatePower(inputGrid: Array<Array<GridComponent>>, width: Int, height: Int, tick: Long = 0): SimulationResult {
+        val grid = Array(width) { x -> Array(height) { y -> inputGrid[x][y] } }
         var activeScriptsCount = 0
 
         for (x in 0 until width) {

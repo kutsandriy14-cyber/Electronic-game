@@ -142,6 +142,7 @@ enum class ComponentType(val category: ComponentCategory) {
     LIQUID_NITROGEN(ComponentCategory.MATERIALS),
     URANIUM(ComponentCategory.MATERIALS),
     MAGIC_DUST(ComponentCategory.MATERIALS),
+    PIPE(ComponentCategory.MATERIALS),
     
     INFINITE_BATTERY(ComponentCategory.POWER),
     INFINITE_WATER(ComponentCategory.MATERIALS),
@@ -169,6 +170,7 @@ enum class ComponentType(val category: ComponentCategory) {
     GYROSCOPE(ComponentCategory.SENSORS),
     MAGNETOMETER(ComponentCategory.SENSORS),
     BAROMETER(ComponentCategory.SENSORS),
+    PRESSURE_SENSOR(ComponentCategory.SENSORS),
     HUMIDITY_SENSOR(ComponentCategory.SENSORS),
     COLOR_SENSOR(ComponentCategory.SENSORS),
     FINGERPRINT_SCANNER(ComponentCategory.SENSORS),
@@ -225,9 +227,14 @@ data class GridComponent(
     val logicState: Boolean = false,
     val extraData: String = "", // For Lua scripts, properties, etc.
     val charge: Float = -1f,
-    val isOverloaded: Boolean = false
+    val isOverloaded: Boolean = false,
+    val voltage: Float = 0f,
+    val current: Float = 0f, // in mA
+    val resistance: Float = 0f, // in Ohms
+    val temperature: Float = 0f, // in Celsius / heat indicator
+    val pressure: Float = 0f // pipe fluid pressure / atmosphere pressure
 ) {
-    fun clone() = GridComponent(type, direction, isPowered, logicState, extraData, charge, isOverloaded)
+    fun clone() = GridComponent(type, direction, isPowered, logicState, extraData, charge, isOverloaded, voltage, current, resistance, temperature, pressure)
 }
 
 data class Telemetry(

@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import com.example.lang.AppLanguage
+import com.example.lang.Lang
+import com.example.ui.components.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
@@ -80,7 +83,38 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
                 Icon(if (state.isSimulationRunning) Icons.Default.Pause else Icons.Default.PlayArrow, "Toggle Simulation", tint = Color(0xFF00FFCC)) 
             }
             IconButton(onClick = { viewModel.clearGrid() }) { Icon(Icons.Default.Delete, "Clear", tint = Color(0xFFFF5555)) }
-            Spacer(modifier = Modifier.width(16.dp))
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            Row(
+                modifier = Modifier
+                    .background(Color(0xFF1E1E2E), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .border(1.dp, Color(0x22FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                listOf(1, 5, 10, 20).forEach { mul ->
+                    val isSelected = state.timeMultiplier == mul
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = if (isSelected) Color(0xFF00FFCC) else Color.Transparent,
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                            )
+                            .clickable { viewModel.setTimeMultiplier(mul) }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "${mul}x",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSelected) Color(0xFF1E1E2E) else Color.White
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            
             IconButton(onClick = { viewModel.showSaveDialog() }) { Icon(Icons.Default.Save, "Save", tint = Color.White) }
             IconButton(onClick = { viewModel.showLoadDialog() }) { Icon(Icons.Default.FolderOpen, "Load", tint = Color.White) }
             IconButton(onClick = { viewModel.showSettingsDialog() }) { Icon(Icons.Default.Settings, "Settings", tint = Color.White) }
@@ -118,11 +152,13 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
                 .align(Alignment.BottomCenter)
                 .padding(16.dp)
                 .fillMaxWidth()
+                .widthIn(max = 800.dp)
                 .background(Color(0xD2121215), shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
                 .border(1.dp, Color(0x22FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
                 .padding(8.dp)
         ) {
             BottomToolBar(
+                lang = state.appLanguage,
                 selectedCategory = state.selectedCategory,
                 selectedTool = state.selectedTool,
                 onCategorySelected = { viewModel.selectCategory(it) },
@@ -130,25 +166,37 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
             )
         }
 
-        if (state.showSaveDialog) SaveDialog({ viewModel.dismissDialogs() }, { name -> viewModel.saveScheme(name) })
-        if (state.showLoadDialog) LoadDialog(savedSchemes, { viewModel.dismissDialogs() }, { scheme -> viewModel.loadScheme(scheme) }, { id -> viewModel.deleteScheme(id) })
-        if (state.showSettingsDialog) SettingsDialog({ viewModel.dismissDialogs() }, { w, h -> viewModel.resizeGrid(w, h) }, { viewModel.getShareableString() }, { viewModel.importShareableString(it) })
+        if (state.showSaveDialog) SaveDialog(lang = state.appLanguage, onDismiss = { viewModel.dismissDialogs() }, onSave = { name -> viewModel.saveScheme(name) })
+        if (state.showLoadDialog) LoadDialog(lang = state.appLanguage, schemes = savedSchemes, onDismiss = { viewModel.dismissDialogs() }, onLoad = { scheme -> viewModel.loadScheme(scheme) }, onDelete = { id -> viewModel.deleteScheme(id) })
+        if (state.showSettingsDialog) SettingsDialog(lang = state.appLanguage, onChangeLang = { viewModel.changeLanguage(it) }, onDismiss = { viewModel.dismissDialogs() }, onResize = { w, h -> viewModel.resizeGrid(w, h) }, exportScheme = { viewModel.getShareableString() }, importScheme = { viewModel.importShareableString(it) })
         state.inspectCoordinates?.let { coords ->
-            val comp = state.grid[coords.first][coords.second]
-            InspectDialog(
-                component = comp,
-                onDismiss = { viewModel.dismissInspect() },
-                onSave = { data, repair -> viewModel.updateComponentData(coords.first, coords.second, data, repair) }
-            )
+            val gridBoundsValid = coords.first in state.grid.indices && coords.second in state.grid[coords.first].indices
+            if (gridBoundsValid) {
+                val comp = state.grid[coords.first][coords.second]
+                InspectDialog(
+                    lang = state.appLanguage,
+                    component = comp,
+                    onDismiss = { viewModel.dismissInspect() },
+                    onSave = { data, repair -> viewModel.updateComponentData(coords.first, coords.second, data, repair) }
+                )
+            } else {
+                viewModel.dismissInspect()
+            }
         }
         
         state.multimeterCoordinates?.let { coords ->
-            val comp = state.grid[coords.first][coords.second]
-            MultimeterDialog(
-                component = comp,
-                coords = coords,
-                onDismiss = { viewModel.dismissMultimeter() }
-            )
+            val gridBoundsValid = coords.first in state.grid.indices && coords.second in state.grid[coords.first].indices
+            if (gridBoundsValid) {
+                val comp = state.grid[coords.first][coords.second]
+                MultimeterDialog(
+                    lang = state.appLanguage,
+                    component = comp,
+                    coords = coords,
+                    onDismiss = { viewModel.dismissMultimeter() }
+                )
+            } else {
+                viewModel.dismissMultimeter()
+            }
         }
         
         if (state.isEasterEggActive) {
@@ -198,6 +246,49 @@ fun MultimeterDialog(component: GridComponent, coords: Pair<Int, Int>, onDismiss
                     )
                     Text("${component.charge}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                     
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("ELECTRICAL DIAGNOSTICS", style = MaterialTheme.typography.labelSmall, color = Color(0xFF00BCD4), fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("Voltage Drop", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            Text(String.format(java.util.Locale.US, "%.2f V", component.voltage), style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Current", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            Text(if (component.current >= 1000f) String.format(java.util.Locale.US, "%.2f A", component.current / 1000f) else String.format(java.util.Locale.US, "%.1f mA", component.current), style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Path Resistance", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            Text(if (component.resistance >= 1000f) String.format(java.util.Locale.US, "%.1f kΩ", component.resistance / 1000f) else String.format(java.util.Locale.US, "%.1f Ω", component.resistance), style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("Power Consumption", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            val powerMw = component.voltage * component.current
+                            Text(if (powerMw >= 1000f) String.format(java.util.Locale.US, "%.2f W", powerMw / 1000f) else String.format(java.util.Locale.US, "%.1f mW", powerMw), style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("THERMAL & FLUIDICS DIAGNOSTICS", style = MaterialTheme.typography.labelSmall, color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column {
+                            Text("Heat Indicator", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            Text(String.format(java.util.Locale.US, "%.1f °C", component.temperature), style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Local Pressure", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            Text(String.format(java.util.Locale.US, "%.1f kPa", component.pressure), style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                        }
+                    }
+
                     if (component.isOverloaded) {
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("Overloaded! Needs repair.", style = MaterialTheme.typography.bodyLarge, color = Color(0xFFE53935), fontWeight = FontWeight.Bold)
@@ -226,6 +317,9 @@ fun CircuitGridCanvas(
     var pan by remember { mutableStateOf(Offset.Zero) }
     val baseCellSize = 60f
 
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isTablet = configuration.screenWidthDp >= 600
+
     val maxCanvasWidth = width * baseCellSize
     val maxCanvasHeight = height * baseCellSize
 
@@ -239,14 +333,69 @@ fun CircuitGridCanvas(
                         pan += panChange
                     }
                 } else {
-                    detectDragGestures { change, _ ->
-                        val localPoint = (change.position - pan) / scale
-                        val cellX = (localPoint.x / baseCellSize).toInt()
-                        val cellY = (localPoint.y / baseCellSize).toInt()
-                        if (cellX in 0 until width && cellY in 0 until height) {
-                            onCellClicked(cellX, cellY)
+                    var lastCellX: Int? = null
+                    var lastCellY: Int? = null
+                    detectDragGestures(
+                        onDragStart = { startOffset ->
+                            val localPoint = (startOffset - pan) / scale
+                            val cellX = (localPoint.x / baseCellSize).toInt()
+                            val cellY = (localPoint.y / baseCellSize).toInt()
+                            if (cellX in 0 until width && cellY in 0 until height) {
+                                onCellClicked(cellX, cellY)
+                            }
+                            lastCellX = cellX
+                            lastCellY = cellY
+                        },
+                        onDragEnd = {
+                            lastCellX = null
+                            lastCellY = null
+                        },
+                        onDragCancel = {
+                            lastCellX = null
+                            lastCellY = null
+                        },
+                        onDrag = { change, _ ->
+                            val localPoint = (change.position - pan) / scale
+                            val cellX = (localPoint.x / baseCellSize).toInt()
+                            val cellY = (localPoint.y / baseCellSize).toInt()
+                            
+                            val previousX = lastCellX
+                            val previousY = lastCellY
+                            
+                            if (previousX != null && previousY != null) {
+                                val dx = Math.abs(cellX - previousX)
+                                val dy = Math.abs(cellY - previousY)
+                                val sx = if (previousX < cellX) 1 else -1
+                                val sy = if (previousY < cellY) 1 else -1
+                                var err = dx - dy
+                                
+                                var currX = previousX
+                                var currY = previousY
+                                
+                                while (true) {
+                                    if (currX in 0 until width && currY in 0 until height) {
+                                        onCellClicked(currX, currY)
+                                    }
+                                    if (currX == cellX && currY == cellY) break
+                                    val e2 = 2 * err
+                                    if (e2 > -dy) {
+                                        err -= dy
+                                        currX += sx
+                                    }
+                                    if (e2 < dx) {
+                                        err += dx
+                                        currY += sy
+                                    }
+                                }
+                            } else {
+                                if (cellX in 0 until width && cellY in 0 until height) {
+                                    onCellClicked(cellX, cellY)
+                                }
+                            }
+                            lastCellX = cellX
+                            lastCellY = cellY
                         }
-                    }
+                    )
                 }
             }
             .pointerInput(selectedTool, scale, pan, width, height) {
@@ -305,8 +454,11 @@ fun CircuitGridCanvas(
                 
                 drawRect(color = Color(0xFFD0BCFF).copy(alpha = 0.5f), size = Size(maxCanvasWidth, maxCanvasHeight), style = Stroke(width = 4f))
 
-                for (x in visibleStartX until minOf(visibleEndX, width)) {
-                    for (y in visibleStartY until minOf(visibleEndY, height)) {
+                val actualGridWidth = grid.size
+                val actualGridHeight = if (actualGridWidth > 0) grid[0].size else 0
+
+                for (x in visibleStartX until minOf(visibleEndX, actualGridWidth)) {
+                    for (y in visibleStartY until minOf(visibleEndY, actualGridHeight)) {
                         if (grid[x][y].type != ComponentType.EMPTY) {
                             drawContext.canvas.save()
                             drawContext.transform.translate(x * baseCellSize, y * baseCellSize)
@@ -322,7 +474,11 @@ fun CircuitGridCanvas(
                                 drawContext.transform.rotate(angle, Offset(baseCellSize/2, baseCellSize/2))
                             }
                             
-                            com.example.engine.RenderEngine.drawComponent(this, grid, x, y, width, height, grid[x][y], baseCellSize)
+                            if (isTablet) {
+                                com.example.engine.TabletRender.drawComponent(this, grid, x, y, actualGridWidth, actualGridHeight, grid[x][y], baseCellSize)
+                            } else {
+                                com.example.engine.PhoneRender.drawComponent(this, grid, x, y, actualGridWidth, actualGridHeight, grid[x][y], baseCellSize)
+                            }
                             drawContext.canvas.restore()
                         }
                     }
@@ -789,6 +945,7 @@ fun DrawScope.drawComponent(grid: Array<Array<GridComponent>>, x: Int, y: Int, w
                     ComponentType.LIQUID_NITROGEN -> Color(0xAA4DD0E1)
                     ComponentType.URANIUM -> Color(0xAA76FF03)
                     ComponentType.MAGIC_DUST -> Color(0xAAE040FB)
+                    ComponentType.PIPE -> Color(0xFF546E7A)
                     ComponentType.FLUID_DRAIN, ComponentType.VOID_HOLE -> Color(0xFF000000)
                     
                     ComponentType.STEEL -> Color(0xFFB0BEC5)
@@ -866,7 +1023,7 @@ fun DrawScope.drawComponent(grid: Array<Array<GridComponent>>, x: Int, y: Int, w
 } */
 
 @Composable
-fun BottomToolBar(selectedCategory: ComponentCategory, selectedTool: ComponentType, onCategorySelected: (ComponentCategory) -> Unit, onToolSelected: (ComponentType) -> Unit) {
+fun BottomToolBar(lang: AppLanguage, selectedCategory: ComponentCategory, selectedTool: ComponentType, onCategorySelected: (ComponentCategory) -> Unit, onToolSelected: (ComponentType) -> Unit) {
     Column(modifier = Modifier.background(Color.Transparent)) {
         ScrollableTabRow(
             selectedTabIndex = ComponentCategory.values().indexOf(selectedCategory),
@@ -888,7 +1045,7 @@ fun BottomToolBar(selectedCategory: ComponentCategory, selectedTool: ComponentTy
                     onClick = { onCategorySelected(category) },
                     text = { 
                         Text(
-                            category.title, 
+                            Lang.getCategoryName(category, lang), 
                             fontSize = 13.sp, 
                             fontWeight = if (selectedCategory == category) FontWeight.Bold else FontWeight.Medium,
                             color = if (selectedCategory == category) Color(0xFF00FFCC) else Color(0xFFAAAAAA)
@@ -903,7 +1060,7 @@ fun BottomToolBar(selectedCategory: ComponentCategory, selectedTool: ComponentTy
         val componentsInCategory = ComponentType.values().filter { it.category == selectedCategory }
         
         LazyVerticalGrid(
-            columns = GridCells.Fixed(5),
+            columns = GridCells.Adaptive(minSize = 72.dp),
             modifier = Modifier.height(120.dp).padding(horizontal = 8.dp),
             contentPadding = PaddingValues(bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -912,7 +1069,7 @@ fun BottomToolBar(selectedCategory: ComponentCategory, selectedTool: ComponentTy
             items(componentsInCategory) { type ->
                 ToolButton(
                     icon = getIconForType(type),
-                    text = type.name.replace("_ANY", "").replace("_OPEN", "").replace("_CLOSED", ""),
+                    text = Lang.getComponentDisplayName(type, lang),
                     isSelected = selectedTool == type,
                     onClick = { onToolSelected(type) }
                 )
@@ -1020,6 +1177,7 @@ fun getIconForType(type: ComponentType): ImageVector {
         ComponentType.LIQUID_NITROGEN -> Icons.Default.SevereCold
         ComponentType.URANIUM -> Icons.Default.Warning
         ComponentType.MAGIC_DUST -> Icons.Default.AutoAwesome
+        ComponentType.PIPE -> Icons.Default.Tune
         ComponentType.FLUID_DRAIN, ComponentType.VOID_HOLE -> Icons.Default.HighlightOff
         ComponentType.CONVEYOR_BELT -> Icons.Default.LinearScale
         ComponentType.PISTON -> Icons.Default.ArrowUpward
@@ -1039,240 +1197,9 @@ fun getIconForType(type: ComponentType): ImageVector {
     }
 }
 
-@Composable
-fun ToolButton(icon: ImageVector, text: String, isSelected: Boolean, onClick: () -> Unit) {
-    val bgColor = if (isSelected) Color(0xFF00FFCC) else Color(0x662A2A35)
-    val tint = if (isSelected) Color(0xFF121215) else Color.White
-    val borderColor = if (isSelected) Color.Transparent else Color(0x33FFFFFF)
-    
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            .clickable(onClick = onClick)
-            .background(bgColor, shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-            .border(1.dp, borderColor, androidx.compose.foundation.shape.RoundedCornerShape(16.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Icon(icon, contentDescription = text, tint = tint, modifier = Modifier.size(26.dp))
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text.substringBefore("_").take(8), 
-                style = MaterialTheme.typography.labelSmall, 
-                fontSize = 10.sp,
-                color = tint, 
-                maxLines = 1,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-            )
-        }
-    }
-}
+// Modularized components section
 
-@Composable
-fun InspectDialog(component: GridComponent, onDismiss: () -> Unit, onSave: (String, Boolean) -> Unit) {
-    var textData by remember { mutableStateOf(component.extraData) }
-    
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f).padding(16.dp),
-            shape = MaterialTheme.shapes.medium
-        ) {
-            Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
-                Text("Inspect/Edit Component: ${component.type.name}", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                if (component.type == ComponentType.MICROCONTROLLER) {
-                    Text("Microcontroller Settings", style = MaterialTheme.typography.labelMedium)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Format: cores=X|mhz=Y|mem_kb=Z", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                    OutlinedTextField(
-                        value = textData,
-                        onValueChange = { textData = it },
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
-                        placeholder = { Text("Example: cores=2|mhz=16|mem_kb=1024\n\n-- SSM Script engine\n-- out(pin, val)\n-- Pin: 0(Top) 1(Right) 2(Bot) 3(Left)\n-- log(Hello World)\n-- if in(0) == 1 then out(1, 1)\n\nif 1==1 then log(Started)\nout(1, 1)") }
-                    )
-                } else if (component.type == ComponentType.MEMORY_RAM || component.type == ComponentType.MEMORY_ROM) {
-                    Text("Memory Tuning", style = MaterialTheme.typography.labelMedium)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Configurable properties (pipe separated)", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                    OutlinedTextField(
-                        value = textData,
-                        onValueChange = { textData = it },
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
-                        placeholder = { Text(if(component.type == ComponentType.MEMORY_RAM) "mem_kb=1024" else "mem_kb=16384") }
-                    )
-                } else if (component.type == ComponentType.MONITOR_OLED || component.type == ComponentType.CRT_MONITOR) {
-                    Text("Display Properties", style = MaterialTheme.typography.labelMedium)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Format: display=TextToDisplay", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                    OutlinedTextField(
-                        value = textData,
-                        onValueChange = { textData = it },
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        placeholder = { Text("e.g. display=Hello") }
-                    )
-                } else {
-                    Text("Properties", style = MaterialTheme.typography.labelMedium)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Format: key=value|key=value\n(v=voltage, c=capacity, r=resistance)", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                    OutlinedTextField(
-                        value = textData,
-                        onValueChange = { textData = it },
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        placeholder = { Text("e.g. v=5|c=1000 or r=330") }
-                    )
-                    if (component.type in listOf(ComponentType.BATTERY, ComponentType.BATTERY_PACK, ComponentType.COIN_CELL, ComponentType.INFINITE_BATTERY)) {
-                        Spacer(modifier=Modifier.height(8.dp))
-                        val currentV = if (component.charge >= 0f) {
-                            val maxV = textData.split("|").find { it.startsWith("v=") }?.substring(2)?.toFloatOrNull() ?: 9f
-                            maxV * (component.charge / com.example.engine.RenderEngine.getMaxCap(component))
-                        } else 0f
-                        Text("Live State: ${String.format(java.util.Locale.US, "%.1f", component.charge.coerceAtLeast(0f))} mAh / ${String.format(java.util.Locale.US, "%.2f", currentV)} V", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary)
-                    }
-                    if (component.isOverloaded) {
-                        Spacer(modifier=Modifier.height(8.dp))
-                        Text("STATUS: OVERLOADED/BURNED OUT", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-                        Spacer(modifier=Modifier.height(4.dp))
-                        Button(onClick = { onSave(textData, true) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Repair Component") }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    if (component.charge >= 0f && !component.isOverloaded && component.type.category == ComponentCategory.POWER && component.type != ComponentType.AC_SOURCE && component.type != ComponentType.GENERATOR && component.type != ComponentType.SOLAR_PANEL) {
-                        TextButton(onClick = { onSave(textData, true) }) { Text("Recharge") }
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = { onSave(textData, false) }) { Text("Save & Update") }
-                }
-            }
-        }
-    }
-}
 
 // Dialogs 
-@Composable
-fun SettingsDialog(onDismiss: () -> Unit, onResize: (Int, Int) -> Unit, exportScheme: () -> String, importScheme: (String) -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    
-    val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/octet-stream")
-    ) { uri ->
-        uri?.let {
-            try {
-                context.contentResolver.openOutputStream(it)?.use { out ->
-                    out.write(exportScheme().toByteArray())
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
+// All customized dialogs reside inside com.example.ui.components
 
-    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri?.let {
-            try {
-                context.contentResolver.openInputStream(it)?.use { input ->
-                    val text = input.bufferedReader().use { reader -> reader.readText() }
-                    importScheme(text)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Settings", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary) },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text("Project Integration", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = { 
-                    exportLauncher.launch("blueprint.esshim")
-                }, modifier = Modifier.fillMaxWidth()) { 
-                    Icon(Icons.Default.UploadFile, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Export to .esshim file") 
-                }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = { 
-                    importLauncher.launch(arrayOf("*/*"))
-                }, modifier = Modifier.fillMaxWidth()) { 
-                    Icon(Icons.Default.Download, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Import .esshim file") 
-                }
-                Spacer(Modifier.height(24.dp))
-                
-                Text("Workspace Setup", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.secondary)
-                Spacer(Modifier.height(4.dp))
-                Text("Warning: Resizing clears your current circuit!", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.height(16.dp))
-                
-                Button(onClick = { onResize(8, 8) }, modifier = Modifier.fillMaxWidth()) { Text("Small Prototype (8x8)") }
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { onResize(16, 16) }, modifier = Modifier.fillMaxWidth()) { Text("Mobile Standard (16x16)") }
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { onResize(32, 32) }, modifier = Modifier.fillMaxWidth()) { Text("Tablet Expansive (32x32)") }
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { onResize(64, 64) }, modifier = Modifier.fillMaxWidth()) { Text("Massive Blueprint (64x64)") }
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { onResize(128, 128) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Motherboard Level 1 (128x128)") }
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { onResize(256, 256) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Motherboard Level 2 (256x256)") }
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { onResize(512, 512) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("City Grid Level (512x512)") }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
-    )
-}
-
-@Composable
-fun SaveDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Save Schema Blueprint") },
-        text = { OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Schema Name") }, singleLine = true) },
-        confirmButton = { Button(onClick = { if (name.isNotBlank()) onSave(name) }) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
-    )
-}
-
-@Composable
-fun LoadDialog(schemes: List<CircuitScheme>, onDismiss: () -> Unit, onLoad: (CircuitScheme) -> Unit, onDelete: (Int) -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f).padding(16.dp), shape = MaterialTheme.shapes.medium) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Saved Blueprints", style = MaterialTheme.typography.titleLarge)
-                Spacer(modifier = Modifier.height(16.dp))
-                if (schemes.isEmpty()) Text("No saved schemas found.", modifier = Modifier.padding(16.dp))
-                else {
-                    LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(schemes) { scheme ->
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Column(modifier = Modifier.weight(1f).clickable { onLoad(scheme) }.padding(8.dp)) {
-                                    Text(scheme.name, style = MaterialTheme.typography.bodyLarge)
-                                    Text("Size: ${scheme.width}x${scheme.height}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                                }
-                                IconButton(onClick = { onDelete(scheme.id) }) { Icon(Icons.Default.Delete, "Delete") }
-                            }
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Close") }
-            }
-        }
-    }
-}

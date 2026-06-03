@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.db.CircuitRepository
 import com.example.db.CircuitScheme
 import com.example.engine.CircuitEngine
+import com.example.lang.AppLanguage
 import com.example.model.ComponentCategory
 import com.example.model.ComponentType
 import com.example.model.GridComponent
@@ -35,7 +36,9 @@ data class SimulatorState(
     val multimeterCoordinates: Pair<Int, Int>? = null, // Open multimeter tooltip for this cell
     val isEasterEggActive: Boolean = false,
     val isSimulationRunning: Boolean = true,
-    val simulationTick: Long = 0
+    val simulationTick: Long = 0,
+    val appLanguage: AppLanguage = AppLanguage.EN,
+    val timeMultiplier: Int = 1 // Acceleration from 1 to 20
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -56,6 +59,8 @@ data class SimulatorState(
         if (inspectCoordinates != other.inspectCoordinates) return false
         if (multimeterCoordinates != other.multimeterCoordinates) return false
         if (isEasterEggActive != other.isEasterEggActive) return false
+        if (appLanguage != other.appLanguage) return false
+        if (timeMultiplier != other.timeMultiplier) return false
         
         // Deep equals last because it is very expensive
         if (!grid.contentDeepEquals(other.grid)) return false
@@ -78,6 +83,8 @@ data class SimulatorState(
         result = 31 * result + isEasterEggActive.hashCode()
         result = 31 * result + isSimulationRunning.hashCode()
         result = 31 * result + simulationTick.hashCode()
+        result = 31 * result + appLanguage.hashCode()
+        result = 31 * result + timeMultiplier.hashCode()
         return result
     }
 }
@@ -99,27 +106,6 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
 
     init {
         startSimulationLoop()
-        startAutoSaveLoop()
-    }
-
-    private fun startAutoSaveLoop() {
-        viewModelScope.launch(Dispatchers.IO) {
-            while (true) {
-                delay(30000) // Auto-save every 30 seconds
-                val state = _uiState.value
-                val data = engine.serializeGrid(state.grid, state.width, state.height)
-                try {
-                    // Save as AutoSave
-                    repository.insert(com.example.db.CircuitScheme(
-                        name = "AutoSave",
-                        gridData = data,
-                        width = state.width,
-                        height = state.height
-                    ))
-                } catch (e: Exception) {
-                }
-            }
-        }
     }
 
     fun getShareableString(): String {
@@ -142,14 +128,33 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
             while (true) {
                 val state = _uiState.value
                 if (state.isSimulationRunning) {
-                    val simResult = engine.calculatePower(state.grid, state.width, state.height, state.simulationTick)
-                    _uiState.update { 
-                        it.copy(
-                            grid = simResult.grid, 
-                            telemetry = simResult.telemetry,
-                            logs = if (simResult.logs.isNotEmpty()) (it.logs + simResult.logs).takeLast(50) else it.logs,
-                            simulationTick = it.simulationTick + 1
-                        ) 
+                    val stepsCount = state.timeMultiplier.coerceIn(1, 20)
+                    var currentGrid = state.grid
+                    var currentTelemetry = state.telemetry
+                    val accumulatedLogs = mutableListOf<String>()
+                    var currentTick = state.simulationTick
+                    
+                    for (step in 0 until stepsCount) {
+                        val simResult = engine.calculatePower(currentGrid, state.width, state.height, currentTick)
+                        currentGrid = simResult.grid
+                        currentTelemetry = simResult.telemetry
+                        if (simResult.logs.isNotEmpty()) {
+                            accumulatedLogs.addAll(simResult.logs)
+                        }
+                        currentTick++
+                    }
+
+                    _uiState.update { current ->
+                        if (current.width == state.width && current.height == state.height) {
+                            current.copy(
+                                grid = currentGrid, 
+                                telemetry = currentTelemetry,
+                                logs = if (accumulatedLogs.isNotEmpty()) (current.logs + accumulatedLogs).takeLast(50) else current.logs,
+                                simulationTick = currentTick
+                            )
+                        } else {
+                            current
+                        }
                     }
                 }
                 delay(50) // 50ms simulation step for smoother physics
@@ -181,6 +186,14 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
         val tool = currentState.selectedTool
         
         if (tool == ComponentType.PAN) return
+        
+        val actualWidth = currentState.grid.size
+        val actualHeight = if (actualWidth > 0) currentState.grid[0].size else 0
+        if (x !in 0 until actualWidth || y !in 0 until actualHeight) return
+
+        if (tool != ComponentType.INSPECT && tool != ComponentType.MULTIMETER) {
+            _uiState.update { it.copy(timeMultiplier = 1) }
+        }
         
         if (tool == ComponentType.INSPECT) {
             val comp = currentState.grid[x][y]
@@ -229,12 +242,12 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
                    (newGrid[x][y].type == ComponentType.SWITCH_OPEN || newGrid[x][y].type == ComponentType.SWITCH_CLOSED)) {
              val currentType = newGrid[x][y].type
              newGrid[x][y] = newGrid[x][y].copy(type = if(currentType == ComponentType.SWITCH_OPEN) ComponentType.SWITCH_CLOSED else ComponentType.SWITCH_OPEN)
-        } else {
+         } else {
             // Check for easter eggs
             if (tool == ComponentType.BATTERY && newGrid[x][y].type == ComponentType.BATTERY) {
                 var batteryCount = 0
-                for (i in 0 until currentState.width) {
-                    for (j in 0 until currentState.height) {
+                for (i in 0 until actualWidth) {
+                    for (j in 0 until actualHeight) {
                         if (newGrid[i][j].type == ComponentType.BATTERY) batteryCount++
                     }
                 }
@@ -247,12 +260,22 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
 
         viewModelScope.launch(Dispatchers.Default) {
             val simResult = engine.calculatePower(newGrid, currentState.width, currentState.height)
-            _uiState.update { it.copy(grid = simResult.grid, telemetry = simResult.telemetry) }
+            _uiState.update { current ->
+                if (current.width == currentState.width && current.height == currentState.height) {
+                    current.copy(grid = simResult.grid, telemetry = simResult.telemetry)
+                } else {
+                    current
+                }
+            }
         }
     }
     
     fun updateComponentData(x: Int, y: Int, data: String, rechargeRepair: Boolean = false) {
         val currentState = _uiState.value
+        val actualWidth = currentState.grid.size
+        val actualHeight = if (actualWidth > 0) currentState.grid[0].size else 0
+        if (x !in 0 until actualWidth || y !in 0 until actualHeight) return
+        
         val newGrid = currentState.grid.map { it.clone() }.toTypedArray()
         var newComp = newGrid[x][y].copy(extraData = data)
         if (rechargeRepair) {
@@ -263,10 +286,20 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
         
         viewModelScope.launch(Dispatchers.Default) {
             val simResult = engine.calculatePower(newGrid, currentState.width, currentState.height)
-            _uiState.update { it.copy(telemetry = simResult.telemetry) }
+            _uiState.update { current ->
+                if (current.width == currentState.width && current.height == currentState.height) {
+                    current.copy(telemetry = simResult.telemetry)
+                } else {
+                    current
+                }
+            }
         }
     }
     
+    fun changeLanguage(lang: AppLanguage) {
+        _uiState.update { it.copy(appLanguage = lang) }
+    }
+
     fun dismissInspect() {
         _uiState.update { it.copy(inspectCoordinates = null) }
     }
@@ -325,5 +358,9 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
     
     fun deleteScheme(id: Int) {
         viewModelScope.launch { repository.deleteById(id) }
+    }
+
+    fun setTimeMultiplier(multiplier: Int) {
+        _uiState.update { it.copy(timeMultiplier = multiplier.coerceIn(1, 20)) }
     }
 }
