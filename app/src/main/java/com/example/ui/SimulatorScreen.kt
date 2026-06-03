@@ -146,6 +146,65 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
             }
         }
 
+        // High-Tech Telemetry HUD Overlay
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 80.dp, end = 16.dp)
+                .width(220.dp)
+                .background(Color(0xD2121215), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                .border(1.dp, Color(0x3300FFCC), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                .padding(12.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = if (state.appLanguage == AppLanguage.RU) "ТЕЛЕМЕТРИЯ" else if (state.appLanguage == AppLanguage.UK) "ТЕЛЕМЕТРІЯ" else "SYSTEM TELEMETRY",
+                    fontSize = 11.sp,
+                    color = Color(0xFF00FFCC),
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                
+                Divider(color = Color(0x22FFFFFF))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = if (state.appLanguage == AppLanguage.RU) "Напряжение" else "Voltage", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                    Text(text = String.format(Locale.US, "%.1f V", state.telemetry.totalVoltage), fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = if (state.appLanguage == AppLanguage.RU) "Общий ток" else "Total Current", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                    Text(text = String.format(Locale.US, "%.0f mA", state.telemetry.totalCurrent), fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = if (state.appLanguage == AppLanguage.RU) "Мощность" else "Total Power", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                    Text(text = String.format(Locale.US, "%.2f W", state.telemetry.totalPower), fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = if (state.appLanguage == AppLanguage.RU) "Коротк. замык." else "Short Circuit", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                    if (state.telemetry.isShortCircuit) {
+                        Text(text = "YES", fontSize = 11.sp, color = Color(0xFFFF3366), fontWeight = FontWeight.Bold)
+                    } else {
+                        Text(text = "NO", fontSize = 11.sp, color = Color(0xFF00FF00), fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
         // Bottom Toolbox Overlay
         Box(
             modifier = Modifier
@@ -474,11 +533,7 @@ fun CircuitGridCanvas(
                                 drawContext.transform.rotate(angle, Offset(baseCellSize/2, baseCellSize/2))
                             }
                             
-                            if (isTablet) {
-                                com.example.engine.TabletRender.drawComponent(this, grid, x, y, actualGridWidth, actualGridHeight, grid[x][y], baseCellSize)
-                            } else {
-                                com.example.engine.PhoneRender.drawComponent(this, grid, x, y, actualGridWidth, actualGridHeight, grid[x][y], baseCellSize)
-                            }
+                            com.example.engine.TabletRender.drawComponent(this, grid, x, y, actualGridWidth, actualGridHeight, grid[x][y], baseCellSize)
                             drawContext.canvas.restore()
                         }
                     }
@@ -1061,7 +1116,7 @@ fun BottomToolBar(lang: AppLanguage, selectedCategory: ComponentCategory, select
         
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 72.dp),
-            modifier = Modifier.height(120.dp).padding(horizontal = 8.dp),
+            modifier = Modifier.height(195.dp).padding(horizontal = 8.dp),
             contentPadding = PaddingValues(bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)

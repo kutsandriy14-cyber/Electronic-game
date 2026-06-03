@@ -29,7 +29,8 @@ object Lang {
             "logic_gates" to "Logic & Gates",
             "analog_ics" to "Analog ICs",
             "advanced_memory" to "Advanced & MCU",
-            "materials_fluids" to "Materials & Fluids",
+            "materials_fluids" to "Materials & Solids",
+            "hydraulics" to "Hydraulics",
             "telemetry" to "Telemetry",
             "voltage" to "Voltage",
             "current" to "Current",
@@ -74,7 +75,8 @@ object Lang {
             "logic_gates" to "Логика и ИМС",
             "analog_ics" to "Аналоговые ИС",
             "advanced_memory" to "Контроллеры",
-            "materials_fluids" to "Материалы и Жидкости",
+            "materials_fluids" to "Твердые блоки",
+            "hydraulics" to "Гидравлика",
             "telemetry" to "Телеметрия",
             "voltage" to "Напряжение",
             "current" to "Ток",
@@ -119,7 +121,8 @@ object Lang {
             "logic_gates" to "Логіка та Елементи",
             "analog_ics" to "Аналогові ІС",
             "advanced_memory" to "Контролери та Пам'ять",
-            "materials_fluids" to "Матеріали та Рідини",
+            "materials_fluids" to "Тверді блоки",
+            "hydraulics" to "Гідравліка",
             "telemetry" to "Телеметрія",
             "voltage" to "Напруга",
             "current" to "Струм",
@@ -165,6 +168,7 @@ object Lang {
             ComponentCategory.LOGIC -> t("logic_gates", lang)
             ComponentCategory.ANALOG_ICS -> t("analog_ics", lang)
             ComponentCategory.ADVANCED -> t("advanced_memory", lang)
+            ComponentCategory.HYDRAULICS -> t("hydraulics", lang)
             ComponentCategory.MATERIALS -> t("materials_fluids", lang)
         }
     }

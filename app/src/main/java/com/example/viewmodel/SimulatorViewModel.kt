@@ -190,10 +190,6 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
         val actualWidth = currentState.grid.size
         val actualHeight = if (actualWidth > 0) currentState.grid[0].size else 0
         if (x !in 0 until actualWidth || y !in 0 until actualHeight) return
-
-        if (tool != ComponentType.INSPECT && tool != ComponentType.MULTIMETER) {
-            _uiState.update { it.copy(timeMultiplier = 1) }
-        }
         
         if (tool == ComponentType.INSPECT) {
             val comp = currentState.grid[x][y]
@@ -213,86 +209,87 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
             return
         }
 
-        val newGrid = currentState.grid.map { it.clone() }.toTypedArray()
+        _uiState.update { current ->
+            val gridCopy = current.grid.map { it.clone() }.toTypedArray()
+            val cell = gridCopy[x][y]
 
-        if (tool == ComponentType.EMPTY) {
-            newGrid[x][y] = GridComponent()
-        } else if (tool == ComponentType.ROTATE) {
-            val cell = newGrid[x][y]
-            if (cell.type != ComponentType.EMPTY) {
-                newGrid[x][y] = cell.copy(direction = cell.direction.next())
-            }
-        } else if (tool == ComponentType.SWITCH_OPEN || tool == ComponentType.SWITCH_CLOSED) {
-            val currentType = newGrid[x][y].type
-            if (currentType == ComponentType.SWITCH_OPEN) {
-                newGrid[x][y] = newGrid[x][y].copy(type = ComponentType.SWITCH_CLOSED)
-            } else if (currentType == ComponentType.SWITCH_CLOSED) {
-                newGrid[x][y] = newGrid[x][y].copy(type = ComponentType.SWITCH_OPEN)
-            } else {
-                newGrid[x][y] = GridComponent(tool)
-            }
-        } else if (tool == ComponentType.PUSH_BUTTON) {
-            val currentType = newGrid[x][y].type
-            if (currentType == ComponentType.PUSH_BUTTON) {
-                newGrid[x][y] = newGrid[x][y].copy(logicState = !newGrid[x][y].logicState)
-            } else {
-                newGrid[x][y] = GridComponent(tool)
-            }
-        } else if (currentState.selectedTool == ComponentType.WIRE_ANY && 
-                   (newGrid[x][y].type == ComponentType.SWITCH_OPEN || newGrid[x][y].type == ComponentType.SWITCH_CLOSED)) {
-             val currentType = newGrid[x][y].type
-             newGrid[x][y] = newGrid[x][y].copy(type = if(currentType == ComponentType.SWITCH_OPEN) ComponentType.SWITCH_CLOSED else ComponentType.SWITCH_OPEN)
-         } else {
-            // Check for easter eggs
-            if (tool == ComponentType.BATTERY && newGrid[x][y].type == ComponentType.BATTERY) {
-                var batteryCount = 0
-                for (i in 0 until actualWidth) {
-                    for (j in 0 until actualHeight) {
-                        if (newGrid[i][j].type == ComponentType.BATTERY) batteryCount++
-                    }
+            if (tool == ComponentType.EMPTY) {
+                gridCopy[x][y] = GridComponent()
+            } else if (tool == ComponentType.ROTATE) {
+                if (cell.type != ComponentType.EMPTY) {
+                    gridCopy[x][y] = cell.copy(direction = cell.direction.next())
                 }
-                if (batteryCount > 8) {
-                    _uiState.update { it.copy(isEasterEggActive = true) }
-                }
-            }
-            newGrid[x][y] = GridComponent(tool)
-        }
-
-        viewModelScope.launch(Dispatchers.Default) {
-            val simResult = engine.calculatePower(newGrid, currentState.width, currentState.height)
-            _uiState.update { current ->
-                if (current.width == currentState.width && current.height == currentState.height) {
-                    current.copy(grid = simResult.grid, telemetry = simResult.telemetry)
+            } else if (tool == ComponentType.SWITCH_OPEN || tool == ComponentType.SWITCH_CLOSED) {
+                val currentType = cell.type
+                if (currentType == ComponentType.SWITCH_OPEN) {
+                    gridCopy[x][y] = cell.copy(type = ComponentType.SWITCH_CLOSED)
+                } else if (currentType == ComponentType.SWITCH_CLOSED) {
+                    gridCopy[x][y] = cell.copy(type = ComponentType.SWITCH_OPEN)
                 } else {
-                    current
+                    gridCopy[x][y] = GridComponent(tool)
+                }
+            } else if (tool == ComponentType.PUSH_BUTTON) {
+                val currentType = cell.type
+                if (currentType == ComponentType.PUSH_BUTTON) {
+                    gridCopy[x][y] = cell.copy(logicState = !cell.logicState)
+                } else {
+                    gridCopy[x][y] = GridComponent(tool)
+                }
+            } else if (current.selectedTool == ComponentType.WIRE_ANY && 
+                       (cell.type == ComponentType.SWITCH_OPEN || cell.type == ComponentType.SWITCH_CLOSED)) {
+                val currentType = cell.type
+                gridCopy[x][y] = cell.copy(type = if(currentType == ComponentType.SWITCH_OPEN) ComponentType.SWITCH_CLOSED else ComponentType.SWITCH_OPEN)
+            } else {
+                // Feature: "зделай нормальние компаненти штоби их можно било поварачувать"
+                // If they click with a tool on a component of the exact SAME type, we ROTATE it!
+                if (cell.type == tool && tool != ComponentType.EMPTY) {
+                    gridCopy[x][y] = cell.copy(direction = cell.direction.next())
+                } else {
+                    if (tool == ComponentType.BATTERY) {
+                        var batteryCount = 0
+                        for (i in 0 until actualWidth) {
+                            for (j in 0 until actualHeight) {
+                                if (gridCopy[i][j].type == ComponentType.BATTERY) batteryCount++
+                            }
+                        }
+                        if (batteryCount > 8) {
+                            _uiState.update { it.copy(isEasterEggActive = true) }
+                        }
+                    }
+                    gridCopy[x][y] = GridComponent(tool)
                 }
             }
+
+            val updatedState = if (!current.isSimulationRunning) {
+                val simResult = engine.calculatePower(gridCopy, current.width, current.height, current.simulationTick)
+                current.copy(grid = simResult.grid, telemetry = simResult.telemetry)
+            } else {
+                current.copy(grid = gridCopy)
+            }
+            updatedState
         }
     }
-    
+
     fun updateComponentData(x: Int, y: Int, data: String, rechargeRepair: Boolean = false) {
-        val currentState = _uiState.value
-        val actualWidth = currentState.grid.size
-        val actualHeight = if (actualWidth > 0) currentState.grid[0].size else 0
-        if (x !in 0 until actualWidth || y !in 0 until actualHeight) return
-        
-        val newGrid = currentState.grid.map { it.clone() }.toTypedArray()
-        var newComp = newGrid[x][y].copy(extraData = data)
-        if (rechargeRepair) {
-             newComp = newComp.copy(isOverloaded = false, charge = -1f) // -1f recalculates max charge
-        }
-        newGrid[x][y] = newComp
-        _uiState.update { it.copy(grid = newGrid, inspectCoordinates = null) }
-        
-        viewModelScope.launch(Dispatchers.Default) {
-            val simResult = engine.calculatePower(newGrid, currentState.width, currentState.height)
-            _uiState.update { current ->
-                if (current.width == currentState.width && current.height == currentState.height) {
-                    current.copy(telemetry = simResult.telemetry)
-                } else {
-                    current
-                }
+        _uiState.update { current ->
+            val actualWidth = current.grid.size
+            val actualHeight = if (actualWidth > 0) current.grid[0].size else 0
+            if (x !in 0 until actualWidth || y !in 0 until actualHeight) return@update current
+            
+            val gridCopy = current.grid.map { it.clone() }.toTypedArray()
+            var newComp = gridCopy[x][y].copy(extraData = data)
+            if (rechargeRepair) {
+                newComp = newComp.copy(isOverloaded = false, charge = -1f) // -1f recalculates max charge
             }
+            gridCopy[x][y] = newComp
+            
+            val updatedState = if (!current.isSimulationRunning) {
+                val simResult = engine.calculatePower(gridCopy, current.width, current.height, current.simulationTick)
+                current.copy(grid = simResult.grid, telemetry = simResult.telemetry, inspectCoordinates = null)
+            } else {
+                current.copy(grid = gridCopy, inspectCoordinates = null)
+            }
+            updatedState
         }
     }
     

@@ -377,11 +377,11 @@ object PhysicsEngine {
 
                     // Heat generation
                     if (uNeighbors >= 2) {
-                        currentTemp += 30f // Critical heat build up!
+                        currentTemp += 150f // 5x faster critical thermal buildup
                     } else if (uNeighbors == 1) {
-                        currentTemp += 5f  // Moderate warming
+                        currentTemp += 25f  // Moderate warming
                     } else {
-                        currentTemp -= 1f  // Slow ambient dispersal
+                        currentTemp -= 0.5f  // Slower ambient dispersal
                     }
 
                     // Cooling logic
@@ -436,18 +436,29 @@ object PhysicsEngine {
                         }
                     }
 
-                    // Fire risk / chain reaction effects
-                    if (currentTemp > 500f) {
+                    // Fire risk / chain reaction effects (50x heightened fire and heat emission sparks)
+                    if (currentTemp > 200f) {
                         for (wd in woodNeighbors) {
-                            if (Math.random() < 0.4) {
+                            if (Math.random() < 0.95) {
                                 grid[wd.first][wd.second] = GridComponent(ComponentType.FIRE)
                             }
                         }
-                        // Spark fire in empty spaces
-                        for (i in 0..3) {
-                            val nx = x + dxs4[i]; val ny = y + dys4[i]
-                            if (nx in 0 until width && ny in 0 until height && grid[nx][ny].type == ComponentType.EMPTY && Math.random() < 0.2) {
-                                grid[nx][ny] = GridComponent(ComponentType.FIRE)
+                        // Spark fire in empty / combustible spaces in a 2-block radius!
+                        for (dx in -2..2) {
+                            for (dy in -2..2) {
+                                if (dx == 0 && dy == 0) continue
+                                val nx = x + dx
+                                val ny = y + dy
+                                if (nx in 0 until width && ny in 0 until height) {
+                                    val targetType = grid[nx][ny].type
+                                    if (targetType == ComponentType.EMPTY && Math.random() < 0.3) {
+                                        grid[nx][ny] = GridComponent(ComponentType.FIRE)
+                                    } else if (targetType == ComponentType.COAL || targetType == ComponentType.GASOLINE || targetType == ComponentType.WOOD) {
+                                        if (Math.random() < 0.7) {
+                                            grid[nx][ny] = GridComponent(ComponentType.FIRE)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

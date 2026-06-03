@@ -190,7 +190,7 @@ object EnergyEngine {
                 }
                 
                 // Realistic dynamic overload/burning based on exact physics
-                if (wasPowered && !finalOverloaded) {
+                if (wasPowered && !finalOverloaded && comp.type != ComponentType.INFINITE_BATTERY && comp.type != ComponentType.AC_SOURCE) {
                     if (comp.type == ComponentType.LED || comp.type == ComponentType.RGB_LED) {
                         if (vLocal > 3.8f || currentMa > 60f) {
                             if (Math.random() < 0.2) finalOverloaded = true
@@ -252,12 +252,10 @@ object EnergyEngine {
         // 5. Short circuit check & Telemetry metrics building
         var isShort = false
         if (totalSources > 0) {
-            // Highly realistic short circuit check: if current exceeds 100 Amps, OR we have powered conductors but zero active loads
-            if (totalCurrentDrawnSum > 100000f || (hasPoweredWires && totalCurrentDrawnSum < 0.1f)) {
+            // Highly realistic short circuit check: if current exceeds 50 Amps (50,000 mA) with low-resistance series components.
+            // Under normal open circuit (no consumers, yes conductors) totalCurrentDrawnSum is 0, which is healthy and safe.
+            if (totalCurrentDrawnSum > 50000f) {
                 isShort = true
-                if (totalCurrentDrawnSum < 0.1f) {
-                    totalCurrentDrawnSum = (averagePowerSourceVoltage / 0.1f) * 1000f // max short circuit Amps
-                }
             }
         }
         

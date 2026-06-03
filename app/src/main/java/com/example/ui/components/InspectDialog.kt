@@ -81,7 +81,7 @@ fun InspectDialog(
                         Spacer(modifier=Modifier.height(8.dp))
                         val currentV = if (component.charge >= 0f) {
                             val maxV = textData.split("|").find { it.startsWith("v=") }?.substring(2)?.toFloatOrNull() ?: 9f
-                            maxV * (component.charge / com.example.engine.PhoneRender.getMaxCap(component))
+                            maxV * (component.charge / com.example.engine.TabletRender.getMaxCap(component))
                         } else 0f
                         Text("${Lang.t("live_state", lang)}: ${String.format(java.util.Locale.US, "%.1f", component.charge.coerceAtLeast(0f))} mAh / ${String.format(java.util.Locale.US, "%.2f", currentV)} V", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary)
                     }
