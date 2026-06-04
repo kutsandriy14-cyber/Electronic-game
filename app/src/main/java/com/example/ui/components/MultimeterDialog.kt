@@ -49,13 +49,24 @@ fun MultimeterDialog(
                             Text(if (component.logicState) "HIGH (1)" else "LOW (0)", style = MaterialTheme.typography.bodyLarge, color = if (component.logicState) Color(0xFF2196F3) else Color(0xFF9E9E9E))
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Charge / Fuel", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    LinearProgressIndicator(
-                        progress = { if (component.charge > 0) 1f else 0f },
-                        modifier = Modifier.fillMaxWidth().height(8.dp),
-                    )
-                    Text("${component.charge}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    val isStorage = component.type in listOf(ComponentType.BATTERY, ComponentType.BATTERY_PACK, ComponentType.COIN_CELL, ComponentType.CAPACITOR)
+                    if (isStorage) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(if (component.type == ComponentType.CAPACITOR) "Capacitor Charge" else "Battery Charge", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        val maxCap = if (component.type == ComponentType.CAPACITOR) component.voltage * 1000f else com.example.engine.RenderEngine.getMaxCap(component)
+                        val doubleMaxCap = if (maxCap > 0f) maxCap else 1f
+                        val fraction = (component.charge / doubleMaxCap).coerceIn(0f, 1f)
+                        LinearProgressIndicator(
+                            progress = { fraction },
+                            modifier = Modifier.fillMaxWidth().height(8.dp),
+                        )
+                        val displayStr = if (component.type == ComponentType.CAPACITOR) {
+                            String.format(java.util.Locale.US, "%.1f uC", component.charge)
+                        } else {
+                            String.format(java.util.Locale.US, "%.0f / %.0f mAh", component.charge.coerceAtLeast(0f), maxCap)
+                        }
+                        Text(displayStr, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("ELECTRICAL DIAGNOSTICS", style = MaterialTheme.typography.labelSmall, color = Color(0xFF00BCD4), fontWeight = FontWeight.Bold)

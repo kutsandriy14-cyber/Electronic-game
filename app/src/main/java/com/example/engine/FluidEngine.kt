@@ -8,6 +8,9 @@ import java.util.LinkedList
 
 object FluidEngine {
 
+    private val rng = ThreadLocal.withInitial { java.util.Random() }
+    private fun rand() = rng.get()!!.nextDouble()
+
     private fun isPassable(type: ComponentType): Boolean {
         return type == ComponentType.EMPTY ||
                type == ComponentType.WATER ||
@@ -42,11 +45,8 @@ object FluidEngine {
         height: Int,
         moved: Array<BooleanArray>
     ) {
-        // Reset and recalculate pressure for all cells.
-        // Atmospheric or base pressure for empty is 0. Pipes usually have local pressure.
         val nextPressure = Array(width) { FloatArray(height) { 0f } }
 
-        // Find rooms (connected groups of passable elements)
         val visited = Array(width) { BooleanArray(height) }
         val dx = intArrayOf(-1, 1, 0, 0)
         val dy = intArrayOf(0, 0, -1, 1)
@@ -54,7 +54,6 @@ object FluidEngine {
         for (x in 0 until width) {
             for (y in 0 until height) {
                 if (!visited[x][y] && isPassable(grid[x][y].type)) {
-                    // BFS to find the whole room
                     val queue = LinkedList<Pair<Int, Int>>()
                     val roomCells = mutableListOf<Pair<Int, Int>>()
                     var isClosed = true
@@ -67,12 +66,10 @@ object FluidEngine {
                         val curr = queue.poll()
                         roomCells.add(curr)
 
-                        // If at the boundary, this room is open to the atmosphere
-                        if (curr.first == 0 || curr.first == width - 1 || curr.second == 0 || curr.second == height - 1) {
+                        if ((curr.first == 0 || curr.first == width - 1 || curr.second == 0 || curr.second == height - 1) && grid[curr.first][curr.second].type == ComponentType.EMPTY) {
                             isClosed = false
                         }
 
-                        // Count active sources or high pressure nodes
                         val compType = grid[curr.first][curr.second].type
                         if (compType == ComponentType.INFINITE_WATER || compType == ComponentType.INFINITE_LAVA) {
                             sourceCount++
@@ -83,9 +80,6 @@ object FluidEngine {
                             val ny = curr.second + dy[i]
                             if (nx in 0 until width && ny in 0 until height) {
                                 val neighborType = grid[nx][ny].type
-                                if (neighborType == ComponentType.INFINITE_WATER || neighborType == ComponentType.INFINITE_LAVA) {
-                                    sourceCount++
-                                }
                                 if (!visited[nx][ny] && isPassable(neighborType)) {
                                     visited[nx][ny] = true
                                     queue.add(Pair(nx, ny))
@@ -94,13 +88,10 @@ object FluidEngine {
                         }
                     }
 
-                    // Enclosed rooms build up pressure if they have sources or infinite inflows
                     if (isClosed && roomCells.isNotEmpty()) {
-                        // Base pressure on number of active fluid streams and room size
-                        // Smaller rooms with active fluid inflows experience higher pressure
                         val fluidInCellCount = roomCells.count { 
                             val t = grid[it.first][it.second].type
-                            t == ComponentType.WATER || t == ComponentType.LAVA || t == ComponentType.OIL || t == ComponentType.ACID 
+                            t == ComponentType.WATER || t == ComponentType.LAVA || t == ComponentType.OIL || t == ComponentType.ACID  || t == ComponentType.SLIME || t == ComponentType.GASOLINE
                         }
                         
                         val ratio = if (roomCells.size > 0) fluidInCellCount.toFloat() / roomCells.size else 0f
@@ -109,14 +100,11 @@ object FluidEngine {
                             roomPressure += (sourceCount * 30f)
                         }
 
-                        // Apply room pressure to all cells inside this closed room
                         for (cell in roomCells) {
                             nextPressure[cell.first][cell.second] = roomPressure.coerceAtLeast(0f)
                         }
 
-                        // Leaks trigger on extremely high room pressure (> 100)
-                        if (roomPressure > 100f && Math.random() < 0.1) {
-                            // Find solid walls bounding this room and crack them!
+                        if (roomPressure > 100f && rand() < 0.1) {
                             val boundingWalls = mutableListOf<Pair<Int, Int>>()
                             for (cell in roomCells) {
                                 for (i in 0..3) {
@@ -131,8 +119,7 @@ object FluidEngine {
                                 }
                             }
                             if (boundingWalls.isNotEmpty()) {
-                                val leakedWall = boundingWalls.random()
-                                // Turn solid wall to empty (cracked leak!)
+                                val leakedWall = boundingWalls.random(kotlin.random.Random(rng.get()!!.nextLong()))
                                 grid[leakedWall.first][leakedWall.second] = GridComponent(ComponentType.EMPTY)
                             }
                         }
@@ -141,8 +128,9 @@ object FluidEngine {
             }
         }
 
-        // --- Pipe Pressure Simulation ---
-        // Let's identify pipe lines and track pressure
+        // Pipe direction convention: the direction indicates FLOW DIRECTION (output side).
+        // INPUT comes from the opposite side. Direction.RIGHT: input from left (inDx=-1),
+        // output to right (outDx=+1).
         for (x in 0 until width) {
             for (y in 0 until height) {
                 val comp = grid[x][y]
@@ -157,10 +145,9 @@ object FluidEngine {
                     
                     if (inX in 0 until width && inY in 0 until height) {
                         val inType = grid[inX][inY].type
-                        val isFluidConnected = inType == ComponentType.WATER || inType == ComponentType.LAVA || inType == ComponentType.OIL || inType == ComponentType.ACID || inType == ComponentType.GASOLINE || inType == ComponentType.PIPE
+                        val isFluidConnected = inType == ComponentType.WATER || inType == ComponentType.LAVA || inType == ComponentType.OIL || inType == ComponentType.ACID || inType == ComponentType.GASOLINE || inType == ComponentType.PIPE || inType == ComponentType.SLIME
                         
                         if (isFluidConnected) {
-                            // Find output blockage to build pressure
                             var currOutX = x + outDx
                             var currOutY = y + outDy
                             var pipeLength = 1
@@ -189,14 +176,16 @@ object FluidEngine {
                             }
                             nextPressure[x][y] = pipePressure.coerceIn(0f, 150f)
 
-                            // Break pipe if pressure is too high! (Utečka / leak)
-                            if (pipePressure > 100f && Math.random() < 0.15) {
-                                grid[x][y] = GridComponent(ComponentType.EMPTY) // pipe burst!
-                                // turn into water/liquid
+                            if (pipePressure > 100f && rand() < 0.15) {
+                                val inFluidType = if (inX in 0 until width && inY in 0 until height) grid[inX][inY].type else ComponentType.WATER
+                                val spiltFluid = if (inFluidType == ComponentType.LAVA || inFluidType == ComponentType.OIL ||
+                                                     inFluidType == ComponentType.ACID || inFluidType == ComponentType.GASOLINE || inFluidType == ComponentType.SLIME) 
+                                                 inFluidType else ComponentType.WATER
+                                grid[x][y] = GridComponent(ComponentType.EMPTY) 
                                 val adjacentX = x + outDx
                                 val adjacentY = y + outDy
                                 if (adjacentX in 0 until width && adjacentY in 0 until height && grid[adjacentX][adjacentY].type == ComponentType.EMPTY) {
-                                    grid[adjacentX][adjacentY] = GridComponent(ComponentType.WATER)
+                                    grid[adjacentX][adjacentY] = GridComponent(spiltFluid)
                                     moved[adjacentX][adjacentY] = true
                                 }
                             }
@@ -206,8 +195,6 @@ object FluidEngine {
             }
         }
 
-        // --- Pressure Sensor Check ---
-        // Pressure sensors output logicState = true if they detect pressure > 35f in adjacent cells
         for (x in 0 until width) {
             for (y in 0 until height) {
                 val comp = grid[x][y]
@@ -230,16 +217,12 @@ object FluidEngine {
                     
                     grid[x][y] = comp.copy(
                         logicState = detectsPressure,
-                        isPowered = detectsPressure,
-                        voltage = if (detectsPressure) 5f else 0f,
-                        current = if (detectsPressure) 20f else 0f,
                         pressure = maxSeenPressure
                     )
                 }
             }
         }
 
-        // Write back calculated pressures to grid
         for (x in 0 until width) {
             for (y in 0 until height) {
                 if (grid[x][y].type != ComponentType.PRESSURE_SENSOR) {

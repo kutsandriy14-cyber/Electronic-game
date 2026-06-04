@@ -297,13 +297,24 @@ fun MultimeterDialog(component: GridComponent, coords: Pair<Int, Int>, onDismiss
                             Text(if (component.logicState) "HIGH (1)" else "LOW (0)", style = MaterialTheme.typography.bodyLarge, color = if (component.logicState) Color(0xFF2196F3) else Color(0xFF9E9E9E))
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Charge / Fuel", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    LinearProgressIndicator(
-                        progress = { if (component.charge > 0) 1f else 0f },
-                        modifier = Modifier.fillMaxWidth().height(8.dp),
-                    )
-                    Text("${component.charge}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    val isStorage = component.type in listOf(ComponentType.BATTERY, ComponentType.BATTERY_PACK, ComponentType.COIN_CELL, ComponentType.CAPACITOR)
+                    if (isStorage) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(if (component.type == ComponentType.CAPACITOR) "Capacitor Charge" else "Battery Charge", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        val maxCap = if (component.type == ComponentType.CAPACITOR) component.voltage * 1000f else com.example.engine.RenderEngine.getMaxCap(component)
+                        val doubleMaxCap = if (maxCap > 0f) maxCap else 1f
+                        val fraction = (component.charge / doubleMaxCap).coerceIn(0f, 1f)
+                        LinearProgressIndicator(
+                            progress = { fraction },
+                            modifier = Modifier.fillMaxWidth().height(8.dp),
+                        )
+                        val displayStr = if (component.type == ComponentType.CAPACITOR) {
+                            String.format(java.util.Locale.US, "%.1f uC", component.charge)
+                        } else {
+                            String.format(java.util.Locale.US, "%.0f / %.0f mAh", component.charge.coerceAtLeast(0f), maxCap)
+                        }
+                        Text(displayStr, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("ELECTRICAL DIAGNOSTICS", style = MaterialTheme.typography.labelSmall, color = Color(0xFF00BCD4), fontWeight = FontWeight.Bold)
@@ -522,12 +533,21 @@ fun CircuitGridCanvas(
                             drawContext.canvas.save()
                             drawContext.transform.translate(x * baseCellSize, y * baseCellSize)
                             
-                            // Apply Rotation
-                            val angle = when(grid[x][y].direction) {
-                                Direction.UP -> 0f
-                                Direction.RIGHT -> 90f
-                                Direction.DOWN -> 180f
-                                Direction.LEFT -> 270f
+                            // Apply Rotation (omit for symmetric/multi-connection wires to ensure flawless drawing)
+                            val compType = grid[x][y].type
+                            val isWire = compType == ComponentType.WIRE_ANY || 
+                                         compType == ComponentType.SUPERCONDUCTOR || 
+                                         compType == ComponentType.HIGH_VOLTAGE_CABLE || 
+                                         compType == ComponentType.FIBER_OPTIC
+                            val angle = if (isWire) {
+                                0f
+                            } else {
+                                when(grid[x][y].direction) {
+                                    Direction.UP -> 0f
+                                    Direction.RIGHT -> 90f
+                                    Direction.DOWN -> 180f
+                                    Direction.LEFT -> 270f
+                                }
                             }
                             if (angle != 0f) {
                                 drawContext.transform.rotate(angle, Offset(baseCellSize/2, baseCellSize/2))
@@ -584,18 +604,10 @@ fun DrawScope.drawComponent(grid: Array<Array<GridComponent>>, x: Int, y: Int, w
             val left = x > 0 && grid[x-1][y].type != ComponentType.EMPTY && grid[x-1][y].type.category != ComponentCategory.TOOLS && grid[x-1][y].type.category != ComponentCategory.MATERIALS
             val right = x < width - 1 && grid[x+1][y].type != ComponentType.EMPTY && grid[x+1][y].type.category != ComponentCategory.TOOLS && grid[x+1][y].type.category != ComponentCategory.MATERIALS
 
-            // Un-rotate the connection logic because we are drawing inside a rotated canvas.
-            // Actually it's simpler: draw from center to edge based on RELATIVE direction.
-            val currentDir = component.direction
-            val relUp = when(currentDir) { Direction.UP -> up; Direction.RIGHT -> left; Direction.DOWN -> down; Direction.LEFT -> right }
-            val relRight = when(currentDir) { Direction.UP -> right; Direction.RIGHT -> up; Direction.DOWN -> left; Direction.LEFT -> down }
-            val relDown = when(currentDir) { Direction.UP -> down; Direction.RIGHT -> right; Direction.DOWN -> up; Direction.LEFT -> left }
-            val relLeft = when(currentDir) { Direction.UP -> left; Direction.RIGHT -> down; Direction.DOWN -> right; Direction.LEFT -> up }
-
-            if (relUp) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cx, 0f), strokeWidth = wStroke)
-            if (relRight) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cellSize, cy), strokeWidth = wStroke)
-            if (relDown) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cx, cellSize), strokeWidth = wStroke)
-            if (relLeft) drawLine(wireColor, start = Offset(cx, cy), end = Offset(0f, cy), strokeWidth = wStroke)
+            if (up) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cx, 0f), strokeWidth = wStroke)
+            if (right) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cellSize, cy), strokeWidth = wStroke)
+            if (down) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cx, cellSize), strokeWidth = wStroke)
+            if (left) drawLine(wireColor, start = Offset(cx, cy), end = Offset(0f, cy), strokeWidth = wStroke)
             
             // Draw center dot if no neighbors or multiple
             val connects = listOf(up, down, left, right).count { it }
@@ -977,7 +989,7 @@ fun DrawScope.drawComponent(grid: Array<Array<GridComponent>>, x: Int, y: Int, w
             }
         }
         else -> {
-            if (component.type.category == ComponentCategory.MATERIALS) {
+            if (component.type.category == ComponentCategory.MATERIALS || component.type.category == ComponentCategory.HYDRAULICS) {
                 val matColor = when(component.type) {
                     ComponentType.WATER, ComponentType.INFINITE_WATER -> Color(0xAA2196F3)
                     ComponentType.LAVA, ComponentType.INFINITE_LAVA -> Color(0xAAFF5722)

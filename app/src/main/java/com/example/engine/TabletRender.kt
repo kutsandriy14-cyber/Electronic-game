@@ -69,7 +69,7 @@ object TabletRender {
             if (cellSize < 32f) {
                 val flatColor = when {
                     component.isOverloaded -> Color(0xFFFF3B30)
-                    type.category == ComponentCategory.MATERIALS -> {
+                    type.category == ComponentCategory.MATERIALS || type.category == ComponentCategory.HYDRAULICS -> {
                         when (type) {
                             ComponentType.WATER, ComponentType.INFINITE_WATER -> Color(0xAA2196F3)
                             ComponentType.LAVA, ComponentType.INFINITE_LAVA -> Color(0xAAFF5722)
@@ -152,16 +152,10 @@ object TabletRender {
                     val left = x > 0 && grid[x-1][y].type != ComponentType.EMPTY && grid[x-1][y].type.category != ComponentCategory.TOOLS && grid[x-1][y].type.category != ComponentCategory.MATERIALS
                     val right = x < width - 1 && grid[x+1][y].type != ComponentType.EMPTY && grid[x+1][y].type.category != ComponentCategory.TOOLS && grid[x+1][y].type.category != ComponentCategory.MATERIALS
 
-                    val currentDir = component.direction
-                    val relUp = when(currentDir) { Direction.UP -> up; Direction.RIGHT -> left; Direction.DOWN -> down; Direction.LEFT -> right }
-                    val relRight = when(currentDir) { Direction.UP -> right; Direction.RIGHT -> up; Direction.DOWN -> left; Direction.LEFT -> down }
-                    val relDown = when(currentDir) { Direction.UP -> down; Direction.RIGHT -> right; Direction.DOWN -> up; Direction.LEFT -> left }
-                    val relLeft = when(currentDir) { Direction.UP -> left; Direction.RIGHT -> down; Direction.DOWN -> right; Direction.LEFT -> up }
-
-                    if (relUp) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cx, 0f), strokeWidth = wStroke)
-                    if (relRight) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cellSize, cy), strokeWidth = wStroke)
-                    if (relDown) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cx, cellSize), strokeWidth = wStroke)
-                    if (relLeft) drawLine(wireColor, start = Offset(cx, cy), end = Offset(0f, cy), strokeWidth = wStroke)
+                    if (up) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cx, 0f), strokeWidth = wStroke)
+                    if (right) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cellSize, cy), strokeWidth = wStroke)
+                    if (down) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cx, cellSize), strokeWidth = wStroke)
+                    if (left) drawLine(wireColor, start = Offset(cx, cy), end = Offset(0f, cy), strokeWidth = wStroke)
                     
                     // High-perf connection counts (avoid array/list helper allocations)
                     val connects = (if (up) 1 else 0) + (if (down) 1 else 0) + (if (left) 1 else 0) + (if (right) 1 else 0)
@@ -518,7 +512,7 @@ object TabletRender {
                 }
 
                 else -> {
-                    if (type.category == ComponentCategory.MATERIALS) {
+                    if (type.category == ComponentCategory.MATERIALS || type.category == ComponentCategory.HYDRAULICS) {
                         val matColor = when (type) {
                             ComponentType.WATER, ComponentType.INFINITE_WATER -> Color(0xAA2196F3)
                             ComponentType.LAVA, ComponentType.INFINITE_LAVA -> Color(0xAAFF5722)

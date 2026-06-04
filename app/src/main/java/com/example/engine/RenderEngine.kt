@@ -50,16 +50,10 @@ object RenderEngine {
                     val left = x > 0 && grid[x-1][y].type != ComponentType.EMPTY && grid[x-1][y].type.category != ComponentCategory.TOOLS && grid[x-1][y].type.category != ComponentCategory.MATERIALS
                     val right = x < width - 1 && grid[x+1][y].type != ComponentType.EMPTY && grid[x+1][y].type.category != ComponentCategory.TOOLS && grid[x+1][y].type.category != ComponentCategory.MATERIALS
 
-                    val currentDir = component.direction
-                    val relUp = when(currentDir) { Direction.UP -> up; Direction.RIGHT -> left; Direction.DOWN -> down; Direction.LEFT -> right }
-                    val relRight = when(currentDir) { Direction.UP -> right; Direction.RIGHT -> up; Direction.DOWN -> left; Direction.LEFT -> down }
-                    val relDown = when(currentDir) { Direction.UP -> down; Direction.RIGHT -> right; Direction.DOWN -> up; Direction.LEFT -> left }
-                    val relLeft = when(currentDir) { Direction.UP -> left; Direction.RIGHT -> down; Direction.DOWN -> right; Direction.LEFT -> up }
-
-                    if (relUp) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cx, 0f), strokeWidth = wStroke)
-                    if (relRight) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cellSize, cy), strokeWidth = wStroke)
-                    if (relDown) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cx, cellSize), strokeWidth = wStroke)
-                    if (relLeft) drawLine(wireColor, start = Offset(cx, cy), end = Offset(0f, cy), strokeWidth = wStroke)
+                    if (up) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cx, 0f), strokeWidth = wStroke)
+                    if (right) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cellSize, cy), strokeWidth = wStroke)
+                    if (down) drawLine(wireColor, start = Offset(cx, cy), end = Offset(cx, cellSize), strokeWidth = wStroke)
+                    if (left) drawLine(wireColor, start = Offset(cx, cy), end = Offset(0f, cy), strokeWidth = wStroke)
                     
                     val connects = listOf(up, down, left, right).count { it }
                     if (connects != 2 || (up && down && left && right)) {
@@ -415,7 +409,7 @@ object RenderEngine {
                     }
                 }
                 else -> {
-                    if (component.type.category == ComponentCategory.MATERIALS) {
+                    if (component.type.category == ComponentCategory.MATERIALS || component.type.category == ComponentCategory.HYDRAULICS) {
                         val matColor = when(component.type) {
                             ComponentType.WATER, ComponentType.INFINITE_WATER -> Color(0xAA2196F3)
                             ComponentType.LAVA, ComponentType.INFINITE_LAVA -> Color(0xAAFF5722)
