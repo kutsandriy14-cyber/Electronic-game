@@ -18,6 +18,7 @@ import com.example.lang.Lang
 import com.example.model.ComponentCategory
 import com.example.model.ComponentType
 import com.example.model.GridComponent
+import com.example.functional.Battery
 
 @Composable
 fun InspectDialog(
@@ -154,7 +155,7 @@ fun InspectDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    if (component.charge >= 0f && !component.isOverloaded && component.type.category == ComponentCategory.POWER && component.type != ComponentType.AC_SOURCE && component.type != ComponentType.GENERATOR && component.type != ComponentType.SOLAR_PANEL) {
+                    if (!component.isOverloaded && (Battery.isBattery(component.type) || component.type == ComponentType.CAPACITOR)) {
                         TextButton(onClick = { onSave(textData, true) }) { 
                             Text(Lang.t("recharge_repair", lang).substringBefore("/").substringBefore("&").trim()) 
                         }

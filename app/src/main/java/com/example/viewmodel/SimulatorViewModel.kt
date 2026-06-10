@@ -10,6 +10,7 @@ import com.example.model.ComponentCategory
 import com.example.model.ComponentType
 import com.example.model.GridComponent
 import com.example.model.Telemetry
+import com.example.functional.Physical
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -219,8 +220,8 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
             if (tool == ComponentType.EMPTY) {
                 gridCopy[x][y] = GridComponent()
             } else if (tool == ComponentType.ROTATE) {
-                if (cell.type != ComponentType.EMPTY) {
-                    gridCopy[x][y] = cell.copy(direction = cell.direction.next())
+                if (Physical.canRotate(cell.type)) {
+                    gridCopy[x][y] = Physical.rotate(cell)
                 }
             } else if (tool == ComponentType.SWITCH_OPEN || tool == ComponentType.SWITCH_CLOSED) {
                 val currentType = cell.type
@@ -245,8 +246,8 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
             } else {
                 // Feature: "зделай нормальние компаненти штоби их можно било поварачувать"
                 // If they click with a tool on a component of the exact SAME type, we ROTATE it!
-                if (cell.type == tool && tool != ComponentType.EMPTY) {
-                    gridCopy[x][y] = cell.copy(direction = cell.direction.next())
+                if (cell.type == tool && Physical.canRotate(tool)) {
+                    gridCopy[x][y] = Physical.rotate(cell)
                 } else {
                     gridCopy[x][y] = GridComponent(tool)
                 }

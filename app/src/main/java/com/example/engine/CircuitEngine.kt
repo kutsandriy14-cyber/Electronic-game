@@ -7,6 +7,7 @@ import com.example.model.Direction
 import com.example.model.GridComponent
 import com.example.model.SimulationResult
 import com.example.model.Telemetry
+import com.example.functional.*
 
 class CircuitEngine {
 

@@ -4,6 +4,7 @@ import com.example.model.ComponentType
 import com.example.model.Direction
 import com.example.model.GridComponent
 import com.example.model.Telemetry
+import com.example.functional.*
 import java.util.PriorityQueue
 
 object EnergyEngine {
@@ -22,21 +23,27 @@ object EnergyEngine {
 
     private fun canPassPower(component: GridComponent, fromX: Int, fromY: Int, toX: Int, toY: Int): Boolean {
         val type = component.type
-        if (type == ComponentType.EMPTY || type == ComponentType.SWITCH_OPEN || type.category.name == "TOOLS") return false
-        if (type == ComponentType.FIBER_OPTIC) return false
+        if (type == ComponentType.EMPTY || type.category.name == "TOOLS") return false
+        if (FiberOptic.isFiberOptic(type)) return false
         
-        if (type == ComponentType.PUSH_BUTTON && !component.logicState) return false
-        if (type == ComponentType.PRESSURE_SENSOR && !component.logicState) return false
+        if (PushButton.isPushButton(type) && !component.logicState) return false
+        if (PressurePad.isMechanicalSensor(type) && !component.logicState) return false
+        if (Sensors.isSensor(type) && type == ComponentType.PRESSURE_SENSOR && !component.logicState) return false
         
-        if (type == ComponentType.RELAY && !component.logicState) return false
-        if (type == ComponentType.TRANSISTOR && !component.logicState) return false
+        if (Switch.isSwitch(type) && !Switch.isConducting(type, component.logicState)) return false
+        if (Transistor.isTransistor(type) && !component.logicState) return false
         
-        if (type == ComponentType.DIODE) {
+        if (Diode.isDiode(type) || ZenerDiode.isZenerDiode(type)) {
             val dir = component.direction
             if (fromX < toX && dir == Direction.RIGHT) return true
             if (fromX > toX && dir == Direction.LEFT) return true
             if (fromY < toY && dir == Direction.DOWN) return true
             if (fromY > toY && dir == Direction.UP) return true
+            
+            // If reverse voltage on Zener diode is above breakdown, it conducts backwards
+            if (ZenerDiode.isZenerDiode(type) && component.voltage > ZenerDiode.getBreakdownVoltage()) {
+                return true
+            }
             return false
         }
         
@@ -55,7 +62,7 @@ object EnergyEngine {
             
             // If we found an active generator (which is not a battery or coin cell)
             val comp = grid[cx][cy]
-            if (isPowerSource(comp.type) && comp.type != ComponentType.BATTERY && comp.type != ComponentType.BATTERY_PACK && comp.type != ComponentType.COIN_CELL && comp.type != ComponentType.INFINITE_BATTERY) {
+            if (Generator.isGenerator(comp.type) || NuclearReactor.isNuclearReactor(comp.type)) {
                 // Verify if it is active
                 var isActive = false
                 if (comp.type == ComponentType.GENERATOR) {
@@ -67,7 +74,7 @@ object EnergyEngine {
                             isActive = true; break
                         }
                     }
-                } else if (comp.type == ComponentType.NUCLEAR_REACTOR) {
+                } else if (NuclearReactor.isNuclearReactor(comp.type)) {
                     var hasWater = false; var hasUranium = false
                     val dxs = intArrayOf(-1, 1, 0, 0)
                     val dys = intArrayOf(0, 0, -1, 1)
@@ -78,9 +85,54 @@ object EnergyEngine {
                             if (grid[nx][ny].type == ComponentType.URANIUM) hasUranium = true
                         }
                     }
-                    isActive = hasWater && hasUranium
+                    isActive = hasWater && hasUranium && comp.temperature < NuclearReactor.getMeltdownTemperature()
+                } else if (GeothermalGenerator.isGeothermalGenerator(comp.type)) {
+                    var hasHeat = comp.temperature > 100f
+                    val dxs = intArrayOf(-1, 1, 0, 0)
+                    val dys = intArrayOf(0, 0, -1, 1)
+                    for (i in 0..3) {
+                        val nx = cx + dxs[i]; val ny = cy + dys[i]
+                        if (nx in 0 until width && ny in 0 until height) {
+                            val adj = grid[nx][ny].type
+                            if (Lava.isLava(adj) || adj == ComponentType.FIRE || grid[nx][ny].temperature >= GeothermalGenerator.getIdealOperatingTemp()) {
+                                        hasHeat = true
+                            }
+                        }
+                    }
+                    isActive = hasHeat
+                } else if (HydroGenerator.isHydroGenerator(comp.type)) {
+                    var hasWater = false
+                    val dxs = intArrayOf(-1, 1, 0, 0)
+                    val dys = intArrayOf(0, 0, -1, 1)
+                    for (i in 0..3) {
+                        val nx = cx + dxs[i]; val ny = cy + dys[i]
+                        if (nx in 0 until width && ny in 0 until height) {
+                            val adj = grid[nx][ny].type
+                            if (adj == ComponentType.WATER || adj == ComponentType.INFINITE_WATER) {
+                                hasWater = true
+                            }
+                        }
+                    }
+                    isActive = hasWater
+                } else if (SolarPanel.isSolarPanel(comp.type)) {
+                    var hasLight = true
+                    if (cy > height * 0.75) {
+                        hasLight = false
+                        val dxs = intArrayOf(-1, 1, 0, 0)
+                        val dys = intArrayOf(0, 0, -1, 1)
+                        for (i in 0..3) {
+                            val nx = cx + dxs[i]; val ny = cy + dys[i]
+                            if (nx in 0 until width && ny in 0 until height) {
+                                val adj = grid[nx][ny]
+                                if (adj.isPowered && Leds.isLuminous(adj.type)) {
+                                    hasLight = true
+                                }
+                            }
+                        }
+                    }
+                    isActive = hasLight
                 } else {
-                    isActive = true // Solar, AC source, Wind Turbine etc always active when placed
+                    isActive = true // AC source, Wind Turbine etc always active when placed
                 }
                 
                 if (isActive) {
@@ -128,11 +180,11 @@ object EnergyEngine {
                 val comp = grid[x][y]
                 if (isPowerSource(comp.type)) {
                     val maxCap = RenderEngine.getMaxCap(comp)
-                    val isBatteryType = comp.type == ComponentType.BATTERY || comp.type == ComponentType.BATTERY_PACK || comp.type == ComponentType.COIN_CELL
+                    val isBatteryType = Battery.isBattery(comp.type)
                     val currentCharge = if (isBatteryType) {
                         if (comp.charge < 0f || comp.charge.isNaN()) maxCap else comp.charge
                     } else {
-                        maxCap
+                        -1f // Generators don't have finite accumulative charge
                     }
                     if (comp.charge != currentCharge) {
                         grid[x][y] = comp.copy(charge = currentCharge)
@@ -146,7 +198,7 @@ object EnergyEngine {
                                 isValidSource = true; break
                             }
                         }
-                    } else if (comp.type == ComponentType.NUCLEAR_REACTOR) {
+                    } else if (NuclearReactor.isNuclearReactor(comp.type)) {
                         var hasWater = false; var hasUranium = false
                         for (i in 0..3) {
                             val nx = x + dxs[i]; val ny = y + dys[i]
@@ -155,8 +207,47 @@ object EnergyEngine {
                                 if (grid[nx][ny].type == ComponentType.URANIUM) hasUranium = true
                             }
                         }
-                        isValidSource = hasWater && hasUranium
+                        isValidSource = hasWater && hasUranium && comp.temperature < NuclearReactor.getMeltdownTemperature()
                         if (isValidSource) totalSourceVoltageSum += 240f
+                    } else if (GeothermalGenerator.isGeothermalGenerator(comp.type)) {
+                        var hasHeat = comp.temperature > 100f
+                        for (i in 0..3) {
+                            val nx = x + dxs[i]; val ny = y + dys[i]
+                            if (nx in 0 until width && ny in 0 until height) {
+                                val adj = grid[nx][ny].type
+                                if (Lava.isLava(adj) || adj == ComponentType.FIRE || grid[nx][ny].temperature >= GeothermalGenerator.getIdealOperatingTemp()) {
+                                    hasHeat = true
+                                }
+                            }
+                        }
+                        isValidSource = hasHeat
+                    } else if (HydroGenerator.isHydroGenerator(comp.type)) {
+                        var hasWater = false
+                        for (i in 0..3) {
+                            val nx = x + dxs[i]; val ny = y + dys[i]
+                            if (nx in 0 until width && ny in 0 until height) {
+                                val adj = grid[nx][ny].type
+                                if (adj == ComponentType.WATER || adj == ComponentType.INFINITE_WATER) {
+                                    hasWater = true
+                                }
+                            }
+                        }
+                        isValidSource = hasWater
+                    } else if (SolarPanel.isSolarPanel(comp.type)) {
+                        var hasLight = true
+                        if (y > height * 0.75) {
+                            hasLight = false
+                            for (i in 0..3) {
+                                val nx = x + dxs[i]; val ny = y + dys[i]
+                                if (nx in 0 until width && ny in 0 until height) {
+                                    val adj = grid[nx][ny]
+                                    if (adj.isPowered && Leds.isLuminous(adj.type)) {
+                                        hasLight = true
+                                    }
+                                }
+                            }
+                        }
+                        isValidSource = hasLight
                     } else if (isBatteryType) {
                         val connectedGen = isConnectedToGenerator(grid, x, y, width, height)
                         if (connectedGen == null && currentCharge > 0.05f) {
@@ -241,7 +332,7 @@ object EnergyEngine {
                         val sComp = grid[src.first][src.second]
                         val sMaxV = CircuitUtils.propFloat(propsCache[src.first][src.second], "v", getDefaultVoltage(sComp.type))
                         val sMaxCharge = RenderEngine.getMaxCap(sComp)
-                        val sIsBatteryType = sComp.type == ComponentType.BATTERY || sComp.type == ComponentType.BATTERY_PACK || sComp.type == ComponentType.COIN_CELL
+                        val sIsBatteryType = Battery.isBattery(sComp.type)
                         val sCharge = if (sIsBatteryType) {
                             if (sComp.charge < 0f || sComp.charge.isNaN()) sMaxCharge else sComp.charge
                         } else {
@@ -261,14 +352,26 @@ object EnergyEngine {
                     
                     if (currentMa > PhysicsConstants.SHORT_CIRCUIT_CURRENT_MA) isShortCircuit = true
 
-                    if (comp.type == ComponentType.WIRE_ANY || comp.type == ComponentType.SUPERCONDUCTOR || comp.type == ComponentType.HIGH_VOLTAGE_CABLE) hasPoweredWires = true
+                    var finalOverloaded = comp.isOverloaded
+
+                    if (WireAny.isWire(comp.type)) {
+                        hasPoweredWires = true
+                        if (currentMa > WireAny.getMaxCurrentAmps(comp.type) * 1000f) {
+                            finalOverloaded = true
+                        }
+                    }
+
+                    if (Fuse.isFuse(comp.type)) {
+                        if (currentMa > Fuse.getMaxCurrentRatingAmps() * 1000f) {
+                            finalOverloaded = true
+                        }
+                    }
 
                     if (isLoad(comp.type)) {
                         totalCurrentDrawnSum += currentMa  
                     }
                     
-                    var finalOverloaded = comp.isOverloaded
-                    if (vLocal > 3.8f) {
+                    if (vLocal > 3.8f && !WireAny.isWire(comp.type) && !Fuse.isFuse(comp.type)) {
                         val overvoltageRatio = (vLocal / 3.8f).coerceAtLeast(1f)
                         val burnProb = (1f - 1f / overvoltageRatio).coerceIn(0f, 1f)
                         if (rand() < burnProb) finalOverloaded = true
@@ -391,28 +494,44 @@ object EnergyEngine {
         val baseR = props["r"]?.toFloatOrNull()
         if (baseR != null) return baseR
 
-        return when (type) {
-            ComponentType.SUPERCONDUCTOR -> 0.001f
-            ComponentType.WIRE_ANY -> 0.05f
-            ComponentType.HIGH_VOLTAGE_CABLE -> 0.02f
-            ComponentType.FIBER_OPTIC -> Float.MAX_VALUE / 2
+        return when {
+            WireAny.isWire(type) -> {
+                when (type) {
+                    ComponentType.SUPERCONDUCTOR -> 0.001f
+                    ComponentType.HIGH_VOLTAGE_CABLE -> 0.02f
+                    else -> 0.05f
+                }
+            }
+            FiberOptic.isFiberOptic(type) -> Float.MAX_VALUE / 2
             
-            ComponentType.RESISTOR -> 330f
-            ComponentType.POTENTIOMETER -> 1000f
-            ComponentType.DIODE, ComponentType.ZENER_DIODE -> 10f
-            ComponentType.TRANSFORMER -> 50f
+            Resistor.isResistor(type) -> Resistor.getDefaultResistanceOhms()
+            Potentiometer.isPotentiometer(type) -> {
+                val valPct = props["p"]?.toFloatOrNull() ?: 0.5f
+                Potentiometer.getResistanceOhms(valPct)
+            }
+            Diode.isDiode(type) || ZenerDiode.isZenerDiode(type) -> 10f
+            Transformer.isTransformer(type) -> 50f
             
-            ComponentType.BULB -> 100f
-            ComponentType.LED, ComponentType.RGB_LED, ComponentType.LASER_DIODE -> 220f
+            Leds.isLuminous(type) -> {
+                when (type) {
+                    ComponentType.LASER_DIODE -> 50f
+                    ComponentType.BULB -> 100f
+                    else -> 220f
+                }
+            }
             
-            ComponentType.MOTOR, ComponentType.WATER_PUMP, ComponentType.FAN -> 50f
-            ComponentType.SERVO_MOTOR, ComponentType.STEPPER_MOTOR -> 80f
+            Motors.isMotorType(type) -> {
+                when (type) {
+                    ComponentType.SERVO_MOTOR, ComponentType.STEPPER_MOTOR -> 80f
+                    else -> 50f
+                }
+            }
             
-            ComponentType.HEATER -> 15f
-            ComponentType.COOLER -> 20f
-            ComponentType.PELTIER_MODULE -> 25f
+            type == ComponentType.HEATER -> 15f
+            type == ComponentType.COOLER -> 20f
+            type == ComponentType.PELTIER_MODULE -> 25f
             
-            ComponentType.PHOTORESISTOR -> {
+            type == ComponentType.PHOTORESISTOR -> {
                 var illuminated = false
                 val dx = intArrayOf(-1, 1, 0, 0)
                 val dy = intArrayOf(0, 0, -1, 1)
@@ -420,14 +539,14 @@ object EnergyEngine {
                     val nx = x + dx[i]; val ny = y + dy[i]
                     if (nx in 0 until grid.size && ny in 0 until grid[0].size) {
                         val adj = grid[nx][ny]
-                        if (adj.isPowered && (adj.type == ComponentType.BULB || adj.type == ComponentType.LED || adj.type == ComponentType.RGB_LED || adj.type == ComponentType.LASER_DIODE)) {
+                        if (adj.isPowered && Leds.isLuminous(adj.type)) {
                             illuminated = true
                         }
                     }
                 }
                 if (illuminated) 330f else 1000000f
             }
-            ComponentType.THERMISTOR -> {
+            type == ComponentType.THERMISTOR -> {
                 var maxTemp = grid[x][y].temperature
                 val dx = intArrayOf(-1, 1, 0, 0)
                 val dy = intArrayOf(0, 0, -1, 1)
@@ -444,27 +563,21 @@ object EnergyEngine {
                 val baseRes = CircuitUtils.propFloat(props, "R", 10000f)
                 (baseRes * Math.exp((b * (1/tK - 1/t0K)).toDouble())).toFloat().coerceIn(10f, 1000000f)
             }
-            ComponentType.SPEAKER, ComponentType.BUZZER -> 8f
+            SpeakerBuzzer.isAcoustic(type) -> 8f
             
-            ComponentType.SWITCH_CLOSED, ComponentType.PUSH_BUTTON, ComponentType.RELAY -> 0.1f
-            ComponentType.STEP_DOWN_CONVERTER, ComponentType.STEP_UP_CONVERTER, ComponentType.INVERTER -> 5f
+            Switch.isSwitch(type) || PushButton.isPushButton(type) -> 0.1f
+            type == ComponentType.STEP_DOWN_CONVERTER || type == ComponentType.STEP_UP_CONVERTER || type == ComponentType.INVERTER -> 5f
             
-            ComponentType.LOGIC_AND, ComponentType.LOGIC_OR, ComponentType.LOGIC_NOT, 
-            ComponentType.LOGIC_NAND, ComponentType.LOGIC_NOR, ComponentType.LOGIC_XOR, ComponentType.LOGIC_XNOR -> 1000f
+            LogicGate.isLogicGate(type) -> 1000f
             
-            ComponentType.MICROCONTROLLER, ComponentType.MEMORY_RAM -> 5000f
+            Microcontroller.isMicrocontrollerOrMemory(type) -> 5000f
             
             else -> 0.5f
         }
     }
 
     fun isPowerSource(type: ComponentType): Boolean {
-        return type in listOf(
-            ComponentType.BATTERY, ComponentType.BATTERY_PACK, ComponentType.COIN_CELL,
-            ComponentType.GENERATOR, ComponentType.SOLAR_PANEL, ComponentType.AC_SOURCE,
-            ComponentType.WIND_TURBINE, ComponentType.NUCLEAR_REACTOR, ComponentType.GEOTHERMAL_GENERATOR,
-            ComponentType.HYDRO_GENERATOR, ComponentType.THERMOELECTRIC_GENERATOR, ComponentType.INFINITE_BATTERY
-        )
+        return Battery.isBattery(type) || Generator.isGenerator(type) || type == ComponentType.INFINITE_BATTERY || type == ComponentType.NUCLEAR_REACTOR
     }
 
     fun isLoad(type: ComponentType): Boolean {
@@ -474,28 +587,18 @@ object EnergyEngine {
     }
 
     fun getDefaultVoltage(type: ComponentType): Float {
+        if (Battery.isBattery(type)) return Battery.getDefaultVoltage(type)
+        if (Generator.isGenerator(type)) return Generator.getDefaultVoltage(type)
         return when (type) {
-            ComponentType.BATTERY -> 9f
-            ComponentType.BATTERY_PACK -> 12f
-            ComponentType.COIN_CELL -> 3f
-            ComponentType.GENERATOR -> 12f
-            ComponentType.SOLAR_PANEL -> 3f
-            ComponentType.AC_SOURCE -> 120f
-            ComponentType.WIND_TURBINE -> 6f
-            ComponentType.NUCLEAR_REACTOR -> 240f
-            ComponentType.GEOTHERMAL_GENERATOR -> 24f
-            ComponentType.HYDRO_GENERATOR -> 18f
-            ComponentType.THERMOELECTRIC_GENERATOR -> 3f
             ComponentType.INFINITE_BATTERY -> 220f
+            ComponentType.NUCLEAR_REACTOR -> 240f
             else -> 9f
         }
     }
 
     fun getDefaultCapacity(type: ComponentType): Float {
+        if (Battery.isBattery(type)) return Battery.getMaxCapacity(type)
         return when (type) {
-            ComponentType.BATTERY -> 1000f
-            ComponentType.BATTERY_PACK -> 5000f
-            ComponentType.COIN_CELL -> 100f
             ComponentType.GENERATOR -> 500f
             ComponentType.SOLAR_PANEL -> 20f
             ComponentType.AC_SOURCE -> Float.MAX_VALUE

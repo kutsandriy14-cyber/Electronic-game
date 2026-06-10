@@ -4,6 +4,7 @@ import com.example.model.ComponentCategory
 import com.example.model.ComponentType
 import com.example.model.Direction
 import com.example.model.GridComponent
+import com.example.functional.Fluid
 import java.util.LinkedList
 
 object FluidEngine {
@@ -12,31 +13,11 @@ object FluidEngine {
     private fun rand() = rng.get()!!.nextDouble()
 
     private fun isPassable(type: ComponentType): Boolean {
-        return type == ComponentType.EMPTY ||
-               type == ComponentType.WATER ||
-               type == ComponentType.LAVA ||
-               type == ComponentType.OIL ||
-               type == ComponentType.ACID ||
-               type == ComponentType.GASOLINE ||
-               type == ComponentType.SLIME ||
-               type == ComponentType.LIQUID_NITROGEN ||
-               type == ComponentType.STEAM ||
-               type == ComponentType.FIRE
+        return Fluid.isPassable(type)
     }
 
     private fun isSolidWall(type: ComponentType): Boolean {
-        return type == ComponentType.STONE ||
-               type == ComponentType.STEEL ||
-               type == ComponentType.COPPER ||
-               type == ComponentType.GOLD ||
-               type == ComponentType.ALUMINUM ||
-               type == ComponentType.PLASTIC ||
-               type == ComponentType.CLAY ||
-               type == ComponentType.BRICK ||
-               type == ComponentType.OBSIDIAN ||
-               type == ComponentType.BEDROCK ||
-               type == ComponentType.GLASS ||
-               type == ComponentType.WOOD
+        return Fluid.isSolidWall(type)
     }
 
     fun calculatePressureAndLeaks(
@@ -91,7 +72,7 @@ object FluidEngine {
                     if (isClosed && roomCells.isNotEmpty()) {
                         val fluidInCellCount = roomCells.count { 
                             val t = grid[it.first][it.second].type
-                            t == ComponentType.WATER || t == ComponentType.LAVA || t == ComponentType.OIL || t == ComponentType.ACID  || t == ComponentType.SLIME || t == ComponentType.GASOLINE
+                            Fluid.isFluid(t)
                         }
                         
                         val ratio = if (roomCells.size > 0) fluidInCellCount.toFloat() / roomCells.size else 0f
@@ -145,7 +126,7 @@ object FluidEngine {
                     
                     if (inX in 0 until width && inY in 0 until height) {
                         val inType = grid[inX][inY].type
-                        val isFluidConnected = inType == ComponentType.WATER || inType == ComponentType.LAVA || inType == ComponentType.OIL || inType == ComponentType.ACID || inType == ComponentType.GASOLINE || inType == ComponentType.PIPE || inType == ComponentType.SLIME
+                        val isFluidConnected = Fluid.isFluid(inType) || inType == ComponentType.PIPE
                         
                         if (isFluidConnected) {
                             var currOutX = x + outDx
@@ -178,9 +159,7 @@ object FluidEngine {
 
                             if (pipePressure > 100f && rand() < 0.15) {
                                 val inFluidType = if (inX in 0 until width && inY in 0 until height) grid[inX][inY].type else ComponentType.WATER
-                                val spiltFluid = if (inFluidType == ComponentType.LAVA || inFluidType == ComponentType.OIL ||
-                                                     inFluidType == ComponentType.ACID || inFluidType == ComponentType.GASOLINE || inFluidType == ComponentType.SLIME) 
-                                                 inFluidType else ComponentType.WATER
+                                val spiltFluid = if (Fluid.isFluid(inFluidType)) inFluidType else ComponentType.WATER
                                 grid[x][y] = GridComponent(ComponentType.EMPTY) 
                                 val adjacentX = x + outDx
                                 val adjacentY = y + outDy
