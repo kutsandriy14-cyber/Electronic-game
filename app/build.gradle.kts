@@ -14,8 +14,8 @@ android {
     applicationId = "com.aistudio.electrosim.abxyz"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 10421
+    versionName = "1.4.21"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
