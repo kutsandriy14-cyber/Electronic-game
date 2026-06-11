@@ -31,10 +31,10 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run Unit Tests
-        run: ./gradlew testDebugUnitTest --stacktrace --no-daemon
+        run: ./gradlew testDebugUnitTest --stacktrace
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace --no-daemon
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
@@ -60,9 +60,14 @@ jobs:
           body: |
             ### 🤖 Автоматический релиз / Automatic Release v${{ env.VERSION_NAME }}
             
-            Релиз сформирован автоматически при пуше изменений в основную ветку.
-            Список изменений (баг-фиксы и новые добавления) автоматически сгенерирован ниже.
-          generate_release_notes: true
+            Релиз сформирован автоматически при пуше изменений в ветку.
+            
+            #### 📝 Список изменений (Changelog):
+            - Исправлена ошибка сборки KSP (NullPointerException) в GitHub Actions путем использования компиляции с включенным демоном Gradle daemon.
+            - Добавлена продвинутая панель телеметрии (со скрытием и возможностью сворачивания в компактный вид).
+            - Оптимизирована симуляция термоядерной активности, урана, Leidenfrost-эффективности воды и формирования расплавленного потока кориума.
+            - Исправлена ошибка сборщика приведения типов `flowChance`.
+            - Расширена очистка и удаление двойных дверей и других физических компонентов.
           draft: false
           prerelease: false
           files: |
