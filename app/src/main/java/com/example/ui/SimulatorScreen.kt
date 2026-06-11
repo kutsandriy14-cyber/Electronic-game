@@ -54,6 +54,7 @@ import java.util.Locale
 fun SimulatorScreen(viewModel: SimulatorViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val savedSchemes by viewModel.savedSchemes.collectAsStateWithLifecycle()
+    var telemetryState by remember { mutableStateOf("FULL") } // "FULL", "COMPACT", "HIDDEN"
 
     Box(
         modifier = Modifier
@@ -155,120 +156,195 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
         }
 
         // High-Tech Telemetry HUD Overlay
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 80.dp, end = 16.dp)
-                .width(220.dp)
-                .background(Color(0xD2121215), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                .border(1.dp, Color(0x3300FFCC), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                .padding(12.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = if (state.appLanguage == AppLanguage.RU) "ТЕЛЕМЕТРИЯ" else if (state.appLanguage == AppLanguage.UK) "ТЕЛЕМЕТРІЯ" else "SYSTEM TELEMETRY",
-                    fontSize = 11.sp,
-                    color = Color(0xFF00FFCC),
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
-                
-                Divider(color = Color(0x22FFFFFF))
-                
+        if (telemetryState == "HIDDEN") {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 80.dp, end = 16.dp)
+                    .background(Color(0xD2121215), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .border(1.dp, Color(0x9900FFCC), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .clickable { telemetryState = "FULL" }
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(text = if (state.appLanguage == AppLanguage.RU) "Напряжение" else "Voltage", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                    Text(text = String.format(Locale.US, "%.1f V", state.telemetry.totalVoltage), fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(text = if (state.appLanguage == AppLanguage.RU) "Общий ток" else "Total Current", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                    Text(text = String.format(Locale.US, "%.0f mA", state.telemetry.totalCurrent), fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(text = if (state.appLanguage == AppLanguage.RU) "Мощность" else "Total Power", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                    Text(text = String.format(Locale.US, "%.2f W", state.telemetry.totalPower), fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(text = if (state.appLanguage == AppLanguage.RU) "Коротк. замык." else "Short Circuit", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                    if (state.telemetry.isShortCircuit) {
-                        Text(text = "YES", fontSize = 11.sp, color = Color(0xFFFF3366), fontWeight = FontWeight.Bold)
-                    } else {
-                        Text(text = "NO", fontSize = 11.sp, color = Color(0xFF00FF00), fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                Divider(color = Color(0x3300FFCC))
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0x1A00FFCC), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                        .border(1.dp, Color(0x6600FFCC), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = if (state.appLanguage == AppLanguage.RU) "[ ПАРАМЕТРЫ СИСТЕМЫ ]" else "[ SYSTEM CORES HUD ]",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF00FFCC),
-                        letterSpacing = 1.sp
+                    Icon(
+                        imageVector = Icons.Default.Visibility,
+                        contentDescription = "Show Telemetry",
+                        tint = Color(0xFF00FFCC),
+                        modifier = Modifier.size(14.dp)
                     )
-
+                    Text(
+                        text = if (state.appLanguage == AppLanguage.RU) "ТЕЛЕМЕТРИЯ [ + ]" else if (state.appLanguage == AppLanguage.UK) "ТЕЛЕМЕТРІЯ [ + ]" else "TELEMETRY [ + ]",
+                        fontSize = 11.sp,
+                        color = Color(0xFF00FFCC),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 80.dp, end = 16.dp)
+                    .width(if (telemetryState == "COMPACT") 180.dp else 220.dp)
+                    .background(Color(0xD2121215), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .border(1.dp, Color(0x3300FFCC), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .padding(10.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (state.appLanguage == AppLanguage.RU) {
+                                if (telemetryState == "COMPACT") "ТЕЛЕМЕТР." else "ТЕЛЕМЕТРИЯ"
+                            } else if (state.appLanguage == AppLanguage.UK) {
+                                if (telemetryState == "COMPACT") "ТЕЛЕМЕТР." else "ТЕЛЕМЕТРІЯ"
+                            } else {
+                                if (telemetryState == "COMPACT") "TELEMETRY" else "SYSTEM TELEMETRY"
+                            },
+                            fontSize = 11.sp,
+                            color = Color(0xFF00FFCC),
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        // Compact / Expand Button
+                        IconButton(
+                            onClick = {
+                                telemetryState = if (telemetryState == "FULL") "COMPACT" else "FULL"
+                            },
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (telemetryState == "FULL") Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (state.appLanguage == AppLanguage.RU) "Уменьшить" else "Minimize",
+                                tint = Color(0xFF00FFCC),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                        
+                        Spacer(Modifier.width(2.dp))
+                        
+                        // Hide Button
+                        IconButton(
+                            onClick = { telemetryState = "HIDDEN" },
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = if (state.appLanguage == AppLanguage.RU) "Скрыть" else "Hide",
+                                tint = Color(0xFFFF5555),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                    
+                    Divider(color = Color(0x22FFFFFF))
+                    
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                        val activeCpuCores = if (state.isSimulationRunning) (1 + mcuCount) else 1
-                        Text(text = if (state.appLanguage == AppLanguage.RU) "Ядра процессора" else "CPU Cores", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                        Text(text = "$activeCpuCores cores", fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                        Text(text = if (state.appLanguage == AppLanguage.RU) "Вольтаж" else "Voltage", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                        Text(text = String.format(Locale.US, "%.1f V", state.telemetry.totalVoltage), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                        val cpuFrequencyMhz = if (state.isSimulationRunning) {
-                            val baseFreq = 80.0f + (mcuCount * 40.0f)
-                            val drift = ((System.currentTimeMillis() % 500) - 250) / 1000f
-                            baseFreq + drift
-                        } else {
-                            0.0f
-                        }
-                        Text(text = if (state.appLanguage == AppLanguage.RU) "МГц процессора" else "CPU Clock", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                        Text(text = if (cpuFrequencyMhz > 0f) String.format(Locale.US, "%.2f MHz", cpuFrequencyMhz) else "0.00 MHz", fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                        Text(text = if (state.appLanguage == AppLanguage.RU) "Ток" else "Current", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                        Text(text = String.format(Locale.US, "%.0f mA", state.telemetry.totalCurrent), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                        val ramUsageMb = if (state.isSimulationRunning) {
-                            val baseRam = 142.4f + (state.width * state.height * 0.05f) + (mcuCount * 12.8f)
-                            val drift = ((System.currentTimeMillis() % 1000) - 500) / 1500f
-                            baseRam + drift
-                        } else {
-                            12.2f + (state.width * state.height * 0.01f)
+                    if (telemetryState == "FULL") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = if (state.appLanguage == AppLanguage.RU) "Мощность" else "Total Power", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                            Text(text = String.format(Locale.US, "%.2f W", state.telemetry.totalPower), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
-                        Text(text = if (state.appLanguage == AppLanguage.RU) "Выделено ОЗУ" else "RAM Allocated", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                        Text(text = String.format(Locale.US, "%.1f MB", ramUsageMb), fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = if (state.appLanguage == AppLanguage.RU) "Коротк. замык." else "Short Circuit", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                            if (state.telemetry.isShortCircuit) {
+                                Text(text = "YES", fontSize = 10.sp, color = Color(0xFFFF3366), fontWeight = FontWeight.Bold)
+                            } else {
+                                Text(text = "NO", fontSize = 10.sp, color = Color(0xFF00FF00), fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Divider(color = Color(0x3300FFCC))
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0x1A00FFCC), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                                .border(1.dp, Color(0x6600FFCC), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = if (state.appLanguage == AppLanguage.RU) "[ ПАРАМЕТРЫ СИСТЕМЫ ]" else "[ SYSTEM CORES HUD ]",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF00FFCC),
+                                letterSpacing = 1.sp
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
+                                val activeCpuCores = if (state.isSimulationRunning) (1 + mcuCount) else 1
+                                Text(text = if (state.appLanguage == AppLanguage.RU) "Ядра процессора" else "CPU Cores", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                                Text(text = "$activeCpuCores cores", fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
+                                val cpuFrequencyMhz = if (state.isSimulationRunning) {
+                                    val baseFreq = 80.0f + (mcuCount * 40.0f)
+                                    val drift = ((System.currentTimeMillis() % 500) - 250) / 1000f
+                                    baseFreq + drift
+                                } else {
+                                    0.0f
+                                }
+                                Text(text = if (state.appLanguage == AppLanguage.RU) "МГц процессора" else "CPU Clock", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                                Text(text = if (cpuFrequencyMhz > 0f) String.format(Locale.US, "%.2f MHz", cpuFrequencyMhz) else "0.00 MHz", fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
+                                val ramUsageMb = if (state.isSimulationRunning) {
+                                    val baseRam = 142.4f + (state.width * state.height * 0.05f) + (mcuCount * 12.8f)
+                                    val drift = ((System.currentTimeMillis() % 1000) - 500) / 1500f
+                                    baseRam + drift
+                                } else {
+                                    12.2f + (state.width * state.height * 0.01f)
+                                }
+                                Text(text = if (state.appLanguage == AppLanguage.RU) "Выделено ОЗУ" else "RAM Allocated", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                                Text(text = String.format(Locale.US, "%.1f MB", ramUsageMb), fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
