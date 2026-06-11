@@ -408,6 +408,571 @@ object RenderEngine {
                         }
                     }
                 }
+                ComponentType.LOGIC_NAND -> {
+                    val path = Path().apply {
+                        moveTo(cx - padding*1.5f, cy - padding*1.2f)
+                        lineTo(cx, cy - padding*1.2f)
+                        arcTo(androidx.compose.ui.geometry.Rect(cx - padding*1.2f, cy - padding*1.2f, cx + padding*1.2f, cy + padding*1.2f), -90f, 180f, false)
+                        lineTo(cx - padding*1.5f, cy + padding*1.2f)
+                        close()
+                    }
+                    drawPath(path, color, style = Stroke(strokeSize))
+                    drawCircle(Color(0xFF2B2930), radius = strokeSize*0.7f, center = Offset(cx + padding*1.2f + strokeSize*0.7f, cy))
+                    drawCircle(color, radius = strokeSize*0.7f, center = Offset(cx + padding*1.2f + strokeSize*0.7f, cy), style = Stroke(strokeSize))
+                    
+                    drawLine(color, start = Offset(cx - padding*1.5f, cy - padding), end = Offset(0f, cy - padding), strokeWidth = strokeSize*0.5f)
+                    drawLine(color, start = Offset(cx - padding*1.5f, cy + padding), end = Offset(0f, cy + padding), strokeWidth = strokeSize*0.5f)
+                    drawLine(color, start = Offset(cx + padding*1.2f + strokeSize*1.4f, cy), end = Offset(cellSize, cy), strokeWidth = strokeSize*0.5f)
+                }
+
+                ComponentType.LOGIC_NOR -> {
+                    val path = Path().apply {
+                        moveTo(cx - padding*1.5f, cy - padding*1.2f)
+                        quadraticTo(cx - padding*0.5f, cy, cx - padding*1.5f, cy + padding*1.2f)
+                        quadraticTo(cx + padding*0.2f, cy + padding*1.2f, cx + padding*1.2f, cy)
+                        quadraticTo(cx + padding*0.2f, cy - padding*1.2f, cx - padding*1.5f, cy - padding*1.2f)
+                    }
+                    drawPath(path, color, style = Stroke(strokeSize))
+                    drawCircle(Color(0xFF2B2930), radius = strokeSize*0.7f, center = Offset(cx + padding*1.2f + strokeSize*1.1f, cy))
+                    drawCircle(color, radius = strokeSize*0.7f, center = Offset(cx + padding*1.2f + strokeSize*1.1f, cy), style = Stroke(strokeSize))
+                    
+                    drawLine(color, start = Offset(cx - padding*1.1f, cy - padding*0.5f), end = Offset(0f, cy - padding*0.5f), strokeWidth = strokeSize*0.5f)
+                    drawLine(color, start = Offset(cx - padding*1.1f, cy + padding*0.5f), end = Offset(0f, cy + padding*0.5f), strokeWidth = strokeSize*0.5f)
+                    drawLine(color, start = Offset(cx + padding*1.2f + strokeSize*1.8f, cy), end = Offset(cellSize, cy), strokeWidth = strokeSize*0.5f)
+                }
+
+                ComponentType.LOGIC_XOR -> {
+                    val path1 = Path().apply {
+                        moveTo(cx - padding*1.7f, cy - padding*1.2f)
+                        quadraticTo(cx - padding*0.7f, cy, cx - padding*1.7f, cy + padding*1.2f)
+                    }
+                    drawPath(path1, color, style = Stroke(strokeSize))
+                    val path = Path().apply {
+                        moveTo(cx - padding*1.3f, cy - padding*1.2f)
+                        quadraticTo(cx - padding*0.3f, cy, cx - padding*1.3f, cy + padding*1.2f)
+                        quadraticTo(cx + padding*0.2f, cy + padding*1.2f, cx + padding*1.2f, cy)
+                        quadraticTo(cx + padding*0.2f, cy - padding*1.2f, cx - padding*1.3f, cy - padding*1.2f)
+                    }
+                    drawPath(path, color, style = Stroke(strokeSize))
+                    
+                    drawLine(color, start = Offset(cx - padding*0.9f, cy - padding*0.5f), end = Offset(0f, cy - padding*0.5f), strokeWidth = strokeSize*0.5f)
+                    drawLine(color, start = Offset(cx - padding*0.9f, cy + padding*0.5f), end = Offset(0f, cy + padding*0.5f), strokeWidth = strokeSize*0.5f)
+                    drawLine(color, start = Offset(cx + padding*1.2f, cy), end = Offset(cellSize, cy), strokeWidth = strokeSize*0.5f)
+                }
+
+                ComponentType.LOGIC_XNOR -> {
+                    val path1 = Path().apply {
+                        moveTo(cx - padding*1.7f, cy - padding*1.2f)
+                        quadraticTo(cx - padding*0.7f, cy, cx - padding*1.7f, cy + padding*1.2f)
+                    }
+                    drawPath(path1, color, style = Stroke(strokeSize))
+                    val path = Path().apply {
+                        moveTo(cx - padding*1.3f, cy - padding*1.2f)
+                        quadraticTo(cx - padding*0.3f, cy, cx - padding*1.3f, cy + padding*1.2f)
+                        quadraticTo(cx + padding*0.2f, cy + padding*1.2f, cx + padding*1.2f, cy)
+                        quadraticTo(cx + padding*0.2f, cy - padding*1.2f, cx - padding*1.3f, cy - padding*1.2f)
+                    }
+                    drawPath(path, color, style = Stroke(strokeSize))
+                    drawCircle(Color(0xFF2B2930), radius = strokeSize*0.7f, center = Offset(cx + padding*1.2f + strokeSize*1.1f, cy))
+                    drawCircle(color, radius = strokeSize*0.7f, center = Offset(cx + padding*1.2f + strokeSize*1.1f, cy), style = Stroke(strokeSize))
+                    
+                    drawLine(color, start = Offset(cx - padding*0.9f, cy - padding*0.5f), end = Offset(0f, cy - padding*0.5f), strokeWidth = strokeSize*0.5f)
+                    drawLine(color, start = Offset(cx - padding*0.9f, cy + padding*0.5f), end = Offset(0f, cy + padding*0.5f), strokeWidth = strokeSize*0.5f)
+                    drawLine(color, start = Offset(cx + padding*1.2f + strokeSize*1.8f, cy), end = Offset(cellSize, cy), strokeWidth = strokeSize*0.5f)
+                }
+
+                ComponentType.D_FLIP_FLOP, ComponentType.T_FLIP_FLOP, ComponentType.JK_FLIP_FLOP, ComponentType.LATCH_SR -> {
+                    drawRect(
+                        brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF2C2C34), Color(0xFF15151A))),
+                        topLeft = Offset(padding, padding), 
+                        size = Size(cellSize - padding*2, cellSize - padding*2)
+                    )
+                    drawRect(color, topLeft = Offset(padding, padding), size = Size(cellSize - padding*2, cellSize - padding*2), style = Stroke(strokeSize))
+                    
+                    val stateCol = if (component.logicState) Color(0xFF00FFCC) else Color(0xFF333333)
+                    drawCircle(stateCol, radius = strokeSize*1.2f, center = Offset(cx, cy))
+                    
+                    when(component.type) {
+                        ComponentType.D_FLIP_FLOP -> {
+                            val dPath = Path().apply {
+                                moveTo(cx - padding*0.8f, cy - padding*0.6f)
+                                lineTo(cx - padding*0.2f, cy - padding*0.6f)
+                                arcTo(androidx.compose.ui.geometry.Rect(cx - padding*0.5f, cy - padding*0.6f, cx + padding*0.3f, cy + padding*0.6f), -90f, 180f, false)
+                                lineTo(cx - padding*0.8f, cy + padding*0.6f)
+                                close()
+                            }
+                            drawPath(dPath, color, style = Stroke(3f))
+                        }
+                        ComponentType.T_FLIP_FLOP -> {
+                            drawLine(color, start = Offset(cx - padding*0.6f, cy - padding*0.6f), end = Offset(cx + padding*0.6f, cy - padding*0.6f), strokeWidth = 4f)
+                            drawLine(color, start = Offset(cx, cy - padding*0.6f), end = Offset(cx, cy + padding*0.6f), strokeWidth = 4f)
+                        }
+                        ComponentType.JK_FLIP_FLOP -> {
+                            drawLine(color, start = Offset(cx - padding*0.7f, cy - padding*0.7f), end = Offset(cx - padding*0.3f, cy - padding*0.7f), strokeWidth = 3f)
+                            drawLine(color, start = Offset(cx - padding*0.5f, cy - padding*0.7f), end = Offset(cx - padding*0.5f, cy + padding*0.5f), strokeWidth = 3f)
+                            drawArc(color, 0f, 180f, false, topLeft = Offset(cx - padding*0.8f, cy + padding*0.1f), size = Size(padding*0.5f, padding*0.5f), style = Stroke(3f))
+                        }
+                        ComponentType.LATCH_SR -> {
+                            drawLine(color, start = Offset(cx - padding*0.7f, cy - padding*0.6f), end = Offset(cx - padding*0.4f, cy), strokeWidth = 3f)
+                            drawLine(color, start = Offset(cx + padding*0.4f, cy), end = Offset(cx + padding*0.7f, cy + padding*0.6f), strokeWidth = 3f)
+                        }
+                        else -> {}
+                    }
+                }
+
+                ComponentType.IC_7400_NAND, ComponentType.IC_7402_NOR, ComponentType.IC_7404_NOT, ComponentType.IC_7408_AND, 
+                ComponentType.IC_7432_OR, ComponentType.IC_7486_XOR, ComponentType.IC_7447_DECODER, ComponentType.IC_CD4017_DECADE -> {
+                    val isDecoder = component.type == ComponentType.IC_7447_DECODER
+                    val isDecade = component.type == ComponentType.IC_CD4017_DECADE
+                    
+                    drawRect(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF202026), Color(0xFF101014))),
+                        topLeft = Offset(padding, padding), 
+                        size = Size(cellSize - padding*2, cellSize - padding*2)
+                    )
+                    drawRect(color, topLeft = Offset(padding, padding), size = Size(cellSize - padding*2, cellSize - padding*2), style = Stroke(strokeSize * 0.7f))
+                    
+                    drawArc(color, 0f, 180f, false, topLeft = Offset(cx - padding*0.6f, padding - padding*0.2f), size = Size(padding*1.2f, padding*0.6f), style = Stroke(strokeSize * 0.5f))
+                    
+                    for (i in 0..3) {
+                        val yOff = padding + i * (cellSize - padding*2) / 3
+                        drawLine(Color(0xFFD3A82C), start = Offset(0f, yOff), end = Offset(padding, yOff), strokeWidth = 3f)
+                        drawLine(Color(0xFFD3A82C), start = Offset(cellSize, yOff), end = Offset(cellSize - padding, yOff), strokeWidth = 3f)
+                    }
+                    
+                    if (isDecoder) {
+                        val segCol = if (component.isPowered) Color(0xFFFF2255) else Color(0xFF4A0E17)
+                        val segW = padding * 1.1f
+                        val segH = 2f
+                        drawRect(segCol, topLeft = Offset(cx - segW/2, cy - padding*0.7f), size = Size(segW, segH))
+                        drawRect(segCol, topLeft = Offset(cx - segW/2, cy), size = Size(segW, segH))
+                        drawRect(segCol, topLeft = Offset(cx - segW/2, cy + padding*0.7f), size = Size(segW, segH))
+                        drawRect(segCol, topLeft = Offset(cx - segW/2 - segH, cy - padding*0.7f), size = Size(segH, padding*0.7f))
+                        drawRect(segCol, topLeft = Offset(cx + segW/2, cy - padding*0.7f), size = Size(segH, padding*0.7f))
+                        drawRect(segCol, topLeft = Offset(cx - segW/2 - segH, cy), size = Size(segH, padding*0.7f))
+                        drawRect(segCol, topLeft = Offset(cx + segW/2, cy), size = Size(segH, padding*0.7f))
+                    } else if (isDecade) {
+                        val activeDot = ((System.currentTimeMillis() / 250) % 10).toInt()
+                        for (d in 0..9) {
+                            val angle = d * 36f * (Math.PI / 180f)
+                            val rx = cx + (padding * 1.1f) * Math.cos(angle).toFloat()
+                            val ry = cy + (padding * 1.1f) * Math.sin(angle).toFloat()
+                            val dotCol = if (component.isPowered && d == activeDot) Color(0xFF00FFCC) else Color(0x3300FFCC)
+                            drawCircle(dotCol, radius = 3f, center = Offset(rx, ry))
+                        }
+                    } else {
+                        val gateCol = when(component.type) {
+                            ComponentType.IC_7400_NAND -> Color(0xFF00FFCC)
+                            ComponentType.IC_7402_NOR -> Color(0xFFFF2255)
+                            ComponentType.IC_7404_NOT -> Color(0xFF22C55E)
+                            ComponentType.IC_7408_AND -> Color(0xFF3B82F6)
+                            ComponentType.IC_7432_OR -> Color(0xFFF97316)
+                            ComponentType.IC_7486_XOR -> Color(0xFFA855F7)
+                            else -> Color(0xFFD3A82C)
+                        }
+                        
+                        drawCircle(gateCol.copy(alpha = 0.25f), radius = padding * 1.2f, center = Offset(cx, cy))
+                        drawCircle(gateCol, radius = strokeSize * 0.7f, center = Offset(cx, cy))
+                        drawLine(gateCol.copy(alpha = 0.5f), start = Offset(cx - padding, cy - padding), end = Offset(cx, cy), strokeWidth = 2f)
+                        drawLine(gateCol.copy(alpha = 0.5f), start = Offset(cx - padding, cy + padding), end = Offset(cx, cy), strokeWidth = 2f)
+                        drawLine(gateCol.copy(alpha = 0.5f), start = Offset(cx, cy), end = Offset(cx + padding, cy), strokeWidth = 2f)
+                    }
+                }
+
+                ComponentType.IC_LM358_OPAMP, ComponentType.IC_LM324_OPAMP -> {
+                    drawRect(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF2C2C34), Color(0xFF15151A))),
+                        topLeft = Offset(padding, padding), 
+                        size = Size(cellSize - padding*2, cellSize - padding*2)
+                    )
+                    drawRect(color, topLeft = Offset(padding, padding), size = Size(cellSize - padding*2, cellSize - padding*2), style = Stroke(strokeSize * 0.7f))
+                    
+                    drawArc(color, 0f, 180f, false, topLeft = Offset(cx - padding*0.5f, padding - padding*0.2f), size = Size(padding, padding*0.4f), style = Stroke(strokeSize * 0.5f))
+                    
+                    val triCol = if (component.isPowered) Color(0xFFA855F7) else Color(0xFF581C87)
+                    val oPath = Path().apply {
+                        moveTo(cx - padding*1.1f, cy - padding*0.8f)
+                        lineTo(cx - padding*0.1f, cy - padding*0.4f)
+                        lineTo(cx - padding*1.1f, cy)
+                        close()
+                    }
+                    drawPath(oPath, triCol, style = Stroke(2f))
+                    if (component.type == ComponentType.IC_LM324_OPAMP) {
+                        val oPath2 = Path().apply {
+                            moveTo(cx + padding*0.1f, cy + padding*0.1f)
+                            lineTo(cx + padding*1.1f, cy + padding*0.5f)
+                            lineTo(cx + padding*0.1f, cy + padding*0.9f)
+                            close()
+                        }
+                        drawPath(oPath2, triCol, style = Stroke(2f))
+                    }
+                }
+
+                ComponentType.IC_LM317_REG -> {
+                    drawRect(Color(0xFF292830), topLeft = Offset(padding*1.2f, cy - padding*0.5f), size = Size(cellSize - padding*2.4f, cellSize/2))
+                    drawRect(color, topLeft = Offset(padding*1.2f, cy - padding*0.5f), size = Size(cellSize - padding*2.4f, cellSize/2), style = Stroke(strokeSize*0.5f))
+                    
+                    drawRect(Color(0xFFB0BEC5), topLeft = Offset(padding*1.5f, padding), size = Size(cellSize - padding*3f, cy - padding*0.5f))
+                    drawCircle(Color(0xFF37474F), radius = strokeSize * 0.8f, center = Offset(cx, padding + (cy - padding*1.5f)/2))
+                    
+                    val pinCol = Color(0xFFECEFF1)
+                    drawLine(pinCol, start = Offset(cx - padding, cy), end = Offset(cx - padding, cellSize), strokeWidth = 3f)
+                    drawLine(pinCol, start = Offset(cx, cy), end = Offset(cx, cellSize), strokeWidth = 3f)
+                    drawLine(pinCol, start = Offset(cx + padding, cy), end = Offset(cx + padding, cellSize), strokeWidth = 3f)
+                }
+
+                ComponentType.IC_L298N_MOTOR -> {
+                    drawRect(Color(0xFF15151A), topLeft = Offset(padding, padding*2), size = Size(cellSize - padding*2, cellSize - padding*3))
+                    
+                    val heatsinkCol = Color(0xFFDC2626)
+                    drawRect(heatsinkCol, topLeft = Offset(padding*1.4f, padding*1.1f), size = Size(cellSize - padding*2.8f, padding*1.7f))
+                    
+                    for (i in 0..4) {
+                        val finX = padding*1.8f + i * (cellSize - padding*3.6f)/4
+                        drawRect(Color(0xFFB91C1C), topLeft = Offset(finX - 2f, padding*0.5f), size = Size(4f, padding*0.6f))
+                    }
+                    
+                    for (i in 0..5) {
+                        val pX = padding*1.2f + i * (cellSize - padding*2.4f)/5
+                        drawLine(Color(0xFFFFD54F), start = Offset(pX, cellSize - padding*1.2f), end = Offset(pX, cellSize), strokeWidth = 2.5f)
+                    }
+                }
+
+                ComponentType.IC_ULN2003 -> {
+                    drawRect(Color(0xFF1E1C24), topLeft = Offset(padding, padding*1.2f), size = Size(cellSize - padding*2, cellSize - padding*2.4f))
+                    drawRect(color, topLeft = Offset(padding, padding*1.2f), size = Size(cellSize - padding*2, cellSize - padding*2.4f), style = Stroke(strokeSize * 0.7f))
+                    
+                    val darCol = if (component.isPowered) Color(0xFF00FFCC) else Color(0xFF4A3E56)
+                    for (i in 0..4) {
+                        val dy = padding*1.8f + i * (cellSize - padding*3.6f)/4
+                        drawLine(darCol, start = Offset(padding*1.8f, dy), end = Offset(cellSize - padding*1.8f, dy), strokeWidth = 2.5f)
+                        drawLine(darCol, start = Offset(cellSize - padding*1.8f, dy), end = Offset(cellSize - padding*2.3f, dy - padding*0.3f), strokeWidth = 2f)
+                    }
+                    for(i in 0..4) {
+                        val py = padding*1.6f + i * (cellSize - padding*3.2f)/4
+                        drawLine(Color(0xFFB0BEC5), start = Offset(0f, py), end = Offset(padding, py), strokeWidth = 2f)
+                        drawLine(Color(0xFFB0BEC5), start = Offset(cellSize, py), end = Offset(cellSize - padding, py), strokeWidth = 2f)
+                    }
+                }
+
+                ComponentType.MULTIPLEXER -> {
+                    val path = Path().apply {
+                        moveTo(cx - padding*1.5f, cy - padding*1.6f)
+                        lineTo(cx + padding*1.5f, cy - padding*0.9f)
+                        lineTo(cx + padding*1.5f, cy + padding*0.9f)
+                        lineTo(cx - padding*1.5f, cy + padding*1.6f)
+                        close()
+                    }
+                    drawPath(path, androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF7F3DEC), Color(0xFF3F1D7C))))
+                    drawPath(path, color, style = Stroke(strokeSize))
+                    drawLine(color, start = Offset(cx - padding*0.5f, cy - padding*0.4f), end = Offset(cx + padding*0.5f, cy), strokeWidth = 3f)
+                }
+
+                ComponentType.DEMULTIPLEXER -> {
+                    val path = Path().apply {
+                        moveTo(cx - padding*1.5f, cy - padding*0.9f)
+                        lineTo(cx + padding*1.5f, cy - padding*1.6f)
+                        lineTo(cx + padding*1.5f, cy + padding*1.6f)
+                        lineTo(cx - padding*1.5f, cy + padding*0.9f)
+                        close()
+                    }
+                    drawPath(path, androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF7F3DEC), Color(0xFF3F1D7C))))
+                    drawPath(path, color, style = Stroke(strokeSize))
+                    drawLine(color, start = Offset(cx - padding*0.5f, cy), end = Offset(cx + padding*0.5f, cy - padding*0.4f), strokeWidth = 3f)
+                }
+
+                ComponentType.SHIFT_REGISTER -> {
+                    drawRect(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF005577), Color(0xFF002233))), 
+                        topLeft = Offset(padding, padding*1.5f), 
+                        size = Size(cellSize - padding*2, cellSize - padding*3)
+                    )
+                    drawRect(color, topLeft = Offset(padding, padding*1.5f), size = Size(cellSize - padding*2, cellSize - padding*3), style = Stroke(strokeSize))
+                    for (i in 1..3) {
+                        val dx = padding + i * (cellSize - padding*2) / 4
+                        drawLine(color, start = Offset(dx, padding*1.5f), end = Offset(dx, cellSize - padding*1.5f), strokeWidth = strokeSize*0.5f)
+                        drawCircle(if (component.logicState) Color(0xFF00FFCC) else Color(0xFF005577), radius = strokeSize*0.6f, center = Offset(dx - (cellSize - padding*2)/8, cy))
+                    }
+                    drawCircle(if (component.logicState) Color(0xFF00FFCC) else Color(0xFF005577), radius = strokeSize*0.6f, center = Offset(cellSize - padding - (cellSize - padding*2)/8, cy))
+                }
+
+                ComponentType.HALF_ADDER, ComponentType.FULL_ADDER -> {
+                    drawRect(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF7F3DEC), Color(0xFF3F1D7C))), 
+                        topLeft = Offset(padding, padding), 
+                        size = Size(cellSize - padding*2, cellSize - padding*2)
+                    )
+                    drawRect(color, topLeft = Offset(padding, padding), size = Size(cellSize - padding*2, cellSize - padding*2), style = Stroke(strokeSize))
+                    val addCol = if (component.isPowered) Color(0xFF00FFCC) else Color(0xFFD0BCFF)
+                    drawLine(addCol, start = Offset(cx - padding*1.1f, cy), end = Offset(cx + padding*1.1f, cy), strokeWidth = strokeSize*1.2f)
+                    drawLine(addCol, start = Offset(cx, cy - padding*1.1f), end = Offset(cx, cy + padding*1.1f), strokeWidth = strokeSize*1.2f)
+                    if (component.type == ComponentType.FULL_ADDER) {
+                        drawCircle(addCol, radius = strokeSize*0.6f, center = Offset(cx + padding*1.2f, cy + padding*1.2f))
+                    }
+                }
+
+                ComponentType.ADC, ComponentType.DAC -> {
+                    drawRect(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF1E3A8A), Color(0xFF172554))), 
+                        topLeft = Offset(padding, padding), 
+                        size = Size(cellSize - padding*2, cellSize - padding*2)
+                    )
+                    drawRect(color, topLeft = Offset(padding, padding), size = Size(cellSize - padding*2, cellSize - padding*2), style = Stroke(strokeSize))
+                    if (component.type == ComponentType.ADC) {
+                        val stairColor = if (component.isPowered) Color(0xFF38BDF8) else Color(0xFF1E40AF)
+                        val path = Path().apply {
+                            moveTo(cx - padding, cy + padding)
+                            lineTo(cx - padding*0.5f, cy + padding)
+                            lineTo(cx - padding*0.5f, cy)
+                            lineTo(cx, cy)
+                            lineTo(cx, cy - padding*0.5f)
+                            lineTo(cx + padding*0.5f, cy - padding*0.5f)
+                            lineTo(cx + padding*0.5f, cy - padding)
+                            lineTo(cx + padding, cy - padding)
+                        }
+                        drawPath(path, stairColor, style = Stroke(strokeSize*0.6f))
+                    } else {
+                        val cvColor = if (component.isPowered) Color(0xFFF43F5E) else Color(0xFF9F1239)
+                        val path = Path().apply {
+                            moveTo(cx - padding, cy + padding)
+                            quadraticTo(cx, cy, cx + padding, cy - padding)
+                        }
+                        drawPath(path, cvColor, style = Stroke(strokeSize*0.6f))
+                    }
+                }
+
+                ComponentType.COMPARATOR, ComponentType.VOLTAGE_REGULATOR, ComponentType.AMPLIFIER, ComponentType.BUFFER -> {
+                    drawRect(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF3B0764), Color(0xFF120024))), 
+                        topLeft = Offset(padding, padding), 
+                        size = Size(cellSize - padding*2, cellSize - padding*2)
+                    )
+                    drawRect(color, topLeft = Offset(padding, padding), size = Size(cellSize - padding*2, cellSize - padding*2), style = Stroke(strokeSize*0.7f))
+                    val symCol = if (component.isPowered) Color(0xFFE9D5FF) else Color(0xFF6B21A8)
+                    when(component.type) {
+                        ComponentType.COMPARATOR -> {
+                            drawCircle(symCol, radius = strokeSize*1.5f, center = Offset(cx, cy), style = Stroke(3f))
+                            drawLine(symCol, start = Offset(cx - strokeSize*0.7f, cy), end = Offset(cx + strokeSize*0.7f, cy), strokeWidth = 3f)
+                            drawLine(symCol, start = Offset(cx, cy - strokeSize*0.7f), end = Offset(cx, cy + strokeSize*0.7f), strokeWidth = 3f)
+                        }
+                        ComponentType.VOLTAGE_REGULATOR -> {
+                            drawLine(symCol, start = Offset(cx - padding, cy - strokeSize*0.5f), end = Offset(cx + padding, cy - strokeSize*0.5f), strokeWidth = 4f)
+                            drawLine(symCol, start = Offset(cx - padding*0.5f, cy + strokeSize*0.5f), end = Offset(cx + padding*0.5f, cy + strokeSize*0.5f), strokeWidth = 3f)
+                        }
+                        ComponentType.AMPLIFIER, ComponentType.BUFFER -> {
+                            val ampPath = Path().apply {
+                                moveTo(cx - padding*0.8f, cy - padding*0.8f)
+                                lineTo(cx + padding*0.8f, cy)
+                                lineTo(cx - padding*0.8f, cy + padding*0.8f)
+                                close()
+                            }
+                            drawPath(ampPath, symCol, style = Stroke(3f))
+                            if (component.type == ComponentType.BUFFER) {
+                                drawCircle(symCol, radius = 3f, center = Offset(cx + padding*0.8f + 4f, cy))
+                            }
+                        }
+                        else -> {}
+                    }
+                }
+
+                ComponentType.KEYPAD_4X4 -> {
+                    drawRect(Color(0xFF212121), topLeft = Offset(padding*0.5f, padding*0.5f), size = Size(cellSize - padding, cellSize - padding))
+                    drawRect(color, topLeft = Offset(padding*0.5f, padding*0.5f), size = Size(cellSize - padding, cellSize - padding), style = Stroke(strokeSize*0.4f))
+                    for (row in 0..3) {
+                        for (col in 0..3) {
+                            val bx = padding * 1.1f + col * (cellSize - padding * 2.2f) / 3
+                            val by = padding * 1.1f + row * (cellSize - padding * 2.2f) / 3
+                            val btnActive = component.logicState && (row == 1 && col == 1)
+                            val btnColor = if (btnActive) Color(0xFFFFEB3B) else Color(0xFF616161)
+                            drawRect(btnColor, topLeft = Offset(bx - 3f, by - 3f), size = Size(6f, 6f))
+                            drawRect(Color.Black, topLeft = Offset(bx - 4f, by - 4f), size = Size(8f, 8f), style = Stroke(1.5f))
+                        }
+                    }
+                }
+
+                ComponentType.JOYSTICK -> {
+                    drawCircle(Color(0xFF303030), radius = cellSize*0.45f, center = Offset(cx, cy))
+                    drawCircle(color, radius = cellSize*0.45f, center = Offset(cx, cy), style = Stroke(strokeSize*0.5f))
+                    drawLine(color.copy(alpha = 0.4f), start = Offset(cx - cellSize*0.4f, cy), end = Offset(cx + cellSize*0.4f, cy), strokeWidth = 1.5f)
+                    drawLine(color.copy(alpha = 0.4f), start = Offset(cx, cy - cellSize*0.4f), end = Offset(cx, cy + cellSize*0.4f), strokeWidth = 1.5f)
+                    drawRect(Color(0xFF00E5FF), topLeft = Offset(cx - 3f, padding), size = Size(6f, 6f))
+                    drawRect(Color(0xFF00E5FF), topLeft = Offset(padding, cy - 3f), size = Size(6f, 6f))
+                    
+                    val stateX = if(component.isPowered) cx + padding*0.4f else cx
+                    val stateY = if(component.isPowered) cy - padding*0.4f else cy
+                    drawCircle(Color.Black, radius = cellSize*0.25f, center = Offset(stateX, stateY))
+                    drawCircle(Color(0xFFE0E0E0), radius = cellSize*0.25f, center = Offset(stateX, stateY), style = Stroke(strokeSize*0.3f))
+                    drawCircle(Color(0xFF888888), radius = strokeSize * 0.8f, center = Offset(stateX, stateY))
+                }
+
+                ComponentType.ENCODER -> {
+                    drawCircle(Color(0xFF424242), radius = cellSize*0.42f, center = Offset(cx, cy))
+                    drawCircle(color, radius = cellSize*0.42f, center = Offset(cx, cy), style = Stroke(strokeSize*0.6f))
+                    for (i in 0..11) {
+                        val angle = i * 30f * (Math.PI / 180f)
+                        val sin = Math.sin(angle).toFloat()
+                        val cos = Math.cos(angle).toFloat()
+                        drawLine(Color.Black, start = Offset(cx + (cellSize*0.33f)*cos, cy + (cellSize*0.33f)*sin), end = Offset(cx + (cellSize*0.42f)*cos, cy + (cellSize*0.42f)*sin), strokeWidth = 2f)
+                    }
+                    val slotAngle = if (component.logicState) 135f else 45f
+                    val sRad = slotAngle * (Math.PI / 180f)
+                    drawLine(Color.White, start = Offset(cx, cy), end = Offset(cx + (cellSize*0.33f)*Math.cos(sRad).toFloat(), cy + (cellSize*0.33f)*Math.sin(sRad).toFloat()), strokeWidth = 4f)
+                }
+
+                ComponentType.POTENTIOMETER -> {
+                    drawCircle(Color(0xFF1976D2), radius = cellSize*0.4f, center = Offset(cx, cy))
+                    drawCircle(color, radius = cellSize*0.4f, center = Offset(cx, cy), style = Stroke(strokeSize))
+                    drawCircle(Color(0xFFB0BEC5), radius = cellSize*0.2f, center = Offset(cx, cy))
+                    val angleScrew = if (component.logicState) 45f else -45f
+                    val sRad = angleScrew * (Math.PI / 180f)
+                    drawLine(Color(0xFF37474F), start = Offset(cx - (cellSize*0.15f)*Math.cos(sRad).toFloat(), cy - (cellSize*0.15f)*Math.sin(sRad).toFloat()), end = Offset(cx + (cellSize*0.15f)*Math.cos(sRad).toFloat(), cy + (cellSize*0.15f)*Math.sin(sRad).toFloat()), strokeWidth = 4f)
+                }
+
+                ComponentType.DISPLAY_7SEG_4DIGIT -> {
+                    drawRect(Color(0xFF121212), topLeft = Offset(padding*0.4f, padding*1.2f), size = Size(cellSize - padding*0.8f, cellSize - padding*2.4f))
+                    drawRect(color, topLeft = Offset(padding*0.4f, padding*1.2f), size = Size(cellSize - padding*0.8f, cellSize - padding*2.4f), style = Stroke(strokeSize*0.4f))
+                    val lit = if (component.isPowered) Color(0xFFFF1744) else Color(0xFF3E000C)
+                    for (d in 0..3) {
+                        val dx = padding * 0.8f + d * (cellSize - padding * 2f) / 3
+                        drawRect(lit, topLeft = Offset(dx, cy - padding*0.6f), size = Size(8f, 2f))
+                        drawRect(lit, topLeft = Offset(dx, cy), size = Size(8f, 2f))
+                        drawRect(lit, topLeft = Offset(dx, cy + padding*0.6f), size = Size(8f, 2f))
+                        drawRect(lit, topLeft = Offset(dx - 1f, cy - padding*0.6f), size = Size(2f, padding*0.6f))
+                        drawRect(lit, topLeft = Offset(dx + 7f, cy - padding*0.6f), size = Size(2f, padding*0.6f))
+                        drawRect(lit, topLeft = Offset(dx - 1f, cy), size = Size(2f, padding*0.6f))
+                        drawRect(lit, topLeft = Offset(dx + 7f, cy), size = Size(2f, padding*0.6f))
+                    }
+                }
+
+                ComponentType.DISPLAY_OLED_128X64 -> {
+                    drawRect(Color(0xFF0D0E15), topLeft = Offset(padding*0.5f, padding*0.8f), size = Size(cellSize - padding, cellSize - padding*1.6f))
+                    drawRect(color, topLeft = Offset(padding*0.5f, padding*0.8f), size = Size(cellSize - padding, cellSize - padding*1.6f), style = Stroke(strokeSize*0.5f))
+                    if (component.isPowered) {
+                        drawRect(Color(0xFFFFEA00), topLeft = Offset(padding*1.1f, padding * 1.2f), size = Size(cellSize - padding*2.2f, padding*0.4f))
+                        drawRect(Color(0xFF00E5FF), topLeft = Offset(padding*1.1f, padding * 1.8f), size = Size(cellSize - padding*2.2f, cellSize - padding*3f))
+                        drawLine(Color(0xFF0D0E15), start = Offset(cx - padding, cy + 3f), end = Offset(cx + padding, cy - 3f), strokeWidth = 2f)
+                    }
+                }
+
+                ComponentType.DISPLAY_TFT_24 -> {
+                    drawRect(Color.Black, topLeft = Offset(padding*0.5f, padding*0.8f), size = Size(cellSize - padding, cellSize - padding*1.6f))
+                    drawRect(color, topLeft = Offset(padding*0.5f, padding*0.8f), size = Size(cellSize - padding, cellSize - padding*1.6f), style = Stroke(strokeSize*0.5f))
+                    if (component.isPowered) {
+                        val barW = (cellSize - padding * 1.4f) / 6
+                        val colors = listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta)
+                        for (i in 0..5) {
+                            drawRect(colors[i], topLeft = Offset(padding * 0.7f + i * barW, padding * 1.1f), size = Size(barW, cellSize - padding * 2.2f))
+                        }
+                    }
+                }
+
+                ComponentType.E_PAPER_DISPLAY -> {
+                    drawRect(Color(0xFFECEFF1), topLeft = Offset(padding*0.5f, padding*0.8f), size = Size(cellSize - padding, cellSize - padding*1.6f))
+                    drawRect(Color(0xFF37474F), topLeft = Offset(padding*0.5f, padding*0.8f), size = Size(cellSize - padding, cellSize - padding*1.6f), style = Stroke(strokeSize*0.5f))
+                    val eInkCol = Color(0xFF263238)
+                    drawRect(eInkCol, topLeft = Offset(padding*1.5f, padding*1.5f), size = Size(cellSize - padding*3f, strokeSize*0.8f))
+                    drawRect(eInkCol, topLeft = Offset(padding*1.5f, cy), size = Size(cellSize - padding*3f, strokeSize*0.8f))
+                    drawLine(eInkCol, start = Offset(cx, cy - padding), end = Offset(cx, cy + padding), strokeWidth = 3f)
+                }
+
+                ComponentType.SOLENOID -> {
+                    val shaftCol = if (component.isPowered) Color(0xFFCFD8DC) else Color(0xFF78909C)
+                    val extendShift = if (component.isPowered) padding*1.1f else 0f
+                    drawRect(shaftCol, topLeft = Offset(cx - strokeSize*0.8f, padding + extendShift), size = Size(strokeSize*1.6f, cellSize - padding*2))
+                    
+                    drawRect(
+                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFFE64A19), Color(0xFFFFCC80))), 
+                        topLeft = Offset(cx - padding*1.4f, padding*2), 
+                        size = Size(padding*2.8f, cellSize - padding*4)
+                    )
+                    drawRect(Color(0xFF5D4037), topLeft = Offset(cx - padding*1.4f, padding*2), size = Size(padding*2.8f, cellSize - padding*4), style = Stroke(strokeSize*0.4f))
+                    
+                    for (i in 0..4) {
+                        val yLine = padding*2.4f + i * (cellSize - padding*4.8f)/4
+                        drawLine(Color(0xFFD84315), start = Offset(cx - padding*1.4f, yLine), end = Offset(cx + padding*1.4f, yLine), strokeWidth = 2.5f)
+                    }
+                }
+
+                ComponentType.LINEAR_ACTUATOR -> {
+                    drawRect(Color(0xFF455A64), topLeft = Offset(cx - padding, padding), size = Size(padding*2, cellSize/2))
+                    drawRect(color, topLeft = Offset(cx - padding, padding), size = Size(padding*2, cellSize/2), style = Stroke(strokeSize*0.5f))
+                    
+                    val extCol = if(component.isPowered) Color(0xFFECEFF1) else Color(0xFF78909C)
+                    val extLen = if(component.isPowered) cellSize/2 else cellSize/3
+                    drawRect(extCol, topLeft = Offset(cx - strokeSize*0.6f, cy), size = Size(strokeSize*1.2f, extLen))
+                    
+                    for (i in 0..3) {
+                        val gy = cy + i * extLen / 4
+                        drawLine(Color(0xFF37474F), start = Offset(cx - strokeSize*0.6f, gy), end = Offset(cx + strokeSize*0.6f, gy), strokeWidth = 1.5f)
+                    }
+                }
+
+                ComponentType.RELAY_MODULE_4CH -> {
+                    drawRect(Color(0xFF121212), topLeft = Offset(padding*0.5f, padding*0.8f), size = Size(cellSize - padding, cellSize - padding*1.6f))
+                    val activeRelay = if (component.isPowered) 1 else -1
+                    for(i in 0..3) {
+                        val rx = padding*0.8f + i * (cellSize - padding*1.6f)/4
+                        val rW = (cellSize - padding*2f)/4
+                        val relayColor = if (i == activeRelay) Color(0xFF00B0FF) else Color(0xFF01579B)
+                        drawRect(relayColor, topLeft = Offset(rx, padding*1.5f), size = Size(rW, cellSize - padding*3f))
+                        drawRect(Color.White.copy(alpha = 0.5f), topLeft = Offset(rx, padding*1.5f), size = Size(rW, cellSize - padding*3f), style = Stroke(1f))
+                        val ledColor = if (i == activeRelay) Color(0xFFFF3300) else Color(0x33FF3300)
+                        drawCircle(ledColor, radius = 2f, center = Offset(rx + rW/2, padding*1.1f))
+                    }
+                }
+
+                ComponentType.PELTIER_MODULE -> {
+                    drawRect(Color(0xFFFAFAFA), topLeft = Offset(padding, padding), size = Size(cellSize - padding*2, cellSize - padding*2))
+                    drawRect(Color(0xFFCFD8DC), topLeft = Offset(padding, padding), size = Size(cellSize - padding*2, cellSize - padding*2), style = Stroke(strokeSize*0.5f))
+                    val pillCol = if(component.isPowered) Color(0xFFFF5722) else Color(0xFF37474F)
+                    for (i in 0..2) {
+                        for(j in 0..2) {
+                            drawRect(pillCol, topLeft = Offset(padding*1.8f + i*padding*1.6f, padding*1.8f + j*padding*1.6f), size = Size(4f, 4f))
+                        }
+                    }
+                    drawLine(Color(0xFFD32F2F), start = Offset(padding, cellSize - padding*1.5f), end = Offset(0f, cellSize), strokeWidth=2.5f)
+                    drawLine(Color.Black, start = Offset(cellSize - padding, cellSize - padding*1.5f), end = Offset(cellSize, cellSize), strokeWidth=2.5f)
+                }
+
+                ComponentType.ACCELEROMETER, ComponentType.GYROSCOPE, ComponentType.MAGNETOMETER -> {
+                    drawCircle(Color(0xFF263238), radius = cellSize*0.42f, center = Offset(cx, cy))
+                    drawCircle(color, radius = cellSize*0.42f, center = Offset(cx, cy), style = Stroke(strokeSize*0.5f))
+                    val arrowCol = if (component.isPowered) Color(0xFF00FFCC) else Color(0xFF546E7A)
+                    drawLine(arrowCol, start = Offset(cx - padding*1.2f, cy), end = Offset(cx + padding*1.2f, cy), strokeWidth = 2f)
+                    drawLine(arrowCol, start = Offset(cx, cy - padding*1.2f), end = Offset(cx, cy + padding*1.2f), strokeWidth = 2f)
+                    drawCircle(arrowCol, radius = 5f, center = Offset(cx, cy))
+                }
+
+                ComponentType.CAMERA_MODULE -> {
+                    drawRect(Color(0xFF1B5E20), topLeft = Offset(padding, padding), size = Size(cellSize - padding*2, cellSize - padding*2))
+                    drawRect(color, topLeft = Offset(padding, padding), size = Size(cellSize - padding*2, cellSize - padding*2), style = Stroke(strokeSize*0.5f))
+                    drawRect(Color(0xFF212121), topLeft = Offset(cx - padding*1.3f, cy - padding*1.3f), size = Size(padding*2.6f, padding*2.6f))
+                    drawCircle(Color(0xFF455A64), radius = strokeSize*2f, center = Offset(cx, cy))
+                    drawCircle(Color(0xFF0D47A1), radius = strokeSize*1.1f, center = Offset(cx, cy))
+                    drawCircle(Color.White.copy(alpha = 0.8f), radius = 2f, center = Offset(cx + strokeSize*0.5f, cy - strokeSize*0.5f))
+                }
+
+                ComponentType.FINGERPRINT_SCANNER -> {
+                    drawRect(Color(0xFF263238), topLeft = Offset(padding, padding), size = Size(cellSize - padding*2, cellSize - padding*2))
+                    drawRect(color, topLeft = Offset(padding, padding), size = Size(cellSize - padding*2, cellSize - padding*2), style = Stroke(strokeSize))
+                    val cyanCol = if (component.isPowered) Color(0xFF00E5FF) else Color(0x4400E5FF)
+                    for (i in 1..3) {
+                        drawArc(cyanCol, 180f, 180f, false, topLeft = Offset(cx - i*padding*0.5f, cy - i*padding*0.5f), size = Size(i*padding, i*padding), style = Stroke(2.5f))
+                        drawArc(cyanCol, 0f, 180f, false, topLeft = Offset(cx - i*padding*0.5f, cy - i*padding*0.3f), size = Size(i*padding, i*padding), style = Stroke(2.5f))
+                    }
+                }
+
+                ComponentType.MICROPHONE -> {
+                    drawCircle(Color(0xFFCFD8DC), radius = cellSize*0.4f, center = Offset(cx, cy))
+                    drawCircle(color, radius = cellSize*0.4f, center = Offset(cx, cy), style = Stroke(strokeSize))
+                    val grCol = Color(0xFF37474F)
+                    for (i in -2..2) {
+                        val dx = cx + i * (cellSize*0.12f)
+                        drawLine(grCol, start = Offset(dx, cy - cellSize*0.3f), end = Offset(dx, cy + cellSize*0.3f), strokeWidth = 1.5f)
+                        drawLine(grCol, start = Offset(cx - cellSize*0.3f, dx), end = Offset(cx + cellSize*0.3f, dx), strokeWidth = 1.5f)
+                    }
+                }
+
                 else -> {
                     if (component.type.category == ComponentCategory.MATERIALS || component.type.category == ComponentCategory.HYDRAULICS) {
                         val matColor = when(component.type) {
@@ -472,9 +1037,7 @@ object RenderEngine {
                             drawLine(Color.White, start = Offset(cellSize*0.2f, 0f), end = Offset(cellSize, cellSize*0.8f), strokeWidth = 1.5f)
                         } else if (component.type == ComponentType.PIPE) {
                             val arrowColor = Color(0xFF00E676)
-                            // Draw inner channel
                             drawRect(Color(0xFF263238), topLeft = Offset(cellSize*0.2f, cellSize*0.2f), size = Size(cellSize*0.6f, cellSize*0.6f))
-                            // Draw flow direction indicator
                             when (component.direction) {
                                 Direction.RIGHT -> {
                                     drawLine(arrowColor, start = Offset(cellSize*0.2f, cy), end = Offset(cellSize*0.8f, cy), strokeWidth = 4f)

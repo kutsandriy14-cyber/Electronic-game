@@ -153,6 +153,7 @@ enum class ComponentType(val category: ComponentCategory) {
     CONVEYOR_BELT(ComponentCategory.OUTPUTS),
     MAGNET(ComponentCategory.OUTPUTS),
     PISTON(ComponentCategory.OUTPUTS),
+    DOUBLE_DOOR(ComponentCategory.OUTPUTS),
     
     // Additional requested components
     KEYPAD_4X4(ComponentCategory.SWITCHES),

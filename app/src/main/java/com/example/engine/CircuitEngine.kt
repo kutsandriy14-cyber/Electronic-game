@@ -289,6 +289,31 @@ class CircuitEngine {
         val logs = runScripts(grid, width, height)
 
         val energyResult = EnergyEngine.simulateEnergyFlow(grid, width, height, activeScriptsCount)
+        
+        // Link double doors so that if either end is powered, both are powered
+        for (tx in 0 until width) {
+            for (ty in 0 until height) {
+                val comp = grid[tx][ty]
+                if (comp.type == ComponentType.DOUBLE_DOOR) {
+                    val dx = Physical.getDx(comp.direction)
+                    val dy = Physical.getDy(comp.direction)
+                    val nx = tx + dx
+                    val ny = ty + dy
+                    if (nx in 0 until width && ny in 0 until height) {
+                        val other = grid[nx][ny]
+                        if (other.type == ComponentType.DOUBLE_DOOR) {
+                            if (comp.isPowered || other.isPowered) {
+                                if (!comp.isPowered || !other.isPowered) {
+                                    grid[tx][ty] = comp.copy(isPowered = true)
+                                    grid[nx][ny] = other.copy(isPowered = true)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         PhysicsEngine.simulateMaterials(grid, width, height, energyResult.telemetry.totalVoltage)
 
         return SimulationResult(grid, energyResult.telemetry, logs)

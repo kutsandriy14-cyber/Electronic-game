@@ -117,6 +117,8 @@ fun SettingsDialog(
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = { onResize(64, 64) }, modifier = Modifier.fillMaxWidth()) { Text("Massive Blueprint (64x64)") }
                 Spacer(Modifier.height(8.dp))
+                Button(onClick = { onResize(180, 180) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)) { Text("Super Computing Grid 32k (180x180)") }
+                Spacer(Modifier.height(8.dp))
                 Button(onClick = { onResize(128, 128) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Motherboard Level 1 (128x128)") }
                 Spacer(Modifier.height(8.dp))
                 Button(onClick = { onResize(256, 256) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Motherboard Level 2 (256x256)") }

@@ -8,6 +8,7 @@ import com.example.engine.CircuitEngine
 import com.example.lang.AppLanguage
 import com.example.model.ComponentCategory
 import com.example.model.ComponentType
+import com.example.model.Direction
 import com.example.model.GridComponent
 import com.example.model.Telemetry
 import com.example.functional.Physical
@@ -218,6 +219,14 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
             val cell = gridCopy[x][y]
 
             if (tool == ComponentType.EMPTY) {
+                if (cell.type == ComponentType.DOUBLE_DOOR) {
+                    val dir = cell.direction
+                    val nx = x + Physical.getDx(dir)
+                    val ny = y + Physical.getDy(dir)
+                    if (nx in 0 until actualWidth && ny in 0 until actualHeight && gridCopy[nx][ny].type == ComponentType.DOUBLE_DOOR) {
+                        gridCopy[nx][ny] = GridComponent()
+                    }
+                }
                 gridCopy[x][y] = GridComponent()
             } else if (tool == ComponentType.ROTATE) {
                 if (Physical.canRotate(cell.type)) {
@@ -247,9 +256,46 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
                 // Feature: "зделай нормальние компаненти штоби их можно било поварачувать"
                 // If they click with a tool on a component of the exact SAME type, we ROTATE it!
                 if (cell.type == tool && Physical.canRotate(tool)) {
-                    gridCopy[x][y] = Physical.rotate(cell)
+                    val rotatedCell = Physical.rotate(cell)
+                    gridCopy[x][y] = rotatedCell
+                    if (tool == ComponentType.DOUBLE_DOOR) {
+                        val oldDir = cell.direction
+                        val oldNx = x + Physical.getDx(oldDir)
+                        val oldNy = y + Physical.getDy(oldDir)
+                        if (oldNx in 0 until actualWidth && oldNy in 0 until actualHeight && gridCopy[oldNx][oldNy].type == ComponentType.DOUBLE_DOOR) {
+                            gridCopy[oldNx][oldNy] = GridComponent()
+                        }
+                        val newDir = rotatedCell.direction
+                        val newNx = x + Physical.getDx(newDir)
+                        val newNy = y + Physical.getDy(newDir)
+                        if (newNx in 0 until actualWidth && newNy in 0 until actualHeight) {
+                            val oppDir = when (newDir) {
+                                Direction.UP -> Direction.DOWN
+                                Direction.DOWN -> Direction.UP
+                                Direction.LEFT -> Direction.RIGHT
+                                Direction.RIGHT -> Direction.LEFT
+                            }
+                            gridCopy[newNx][newNy] = GridComponent(type = ComponentType.DOUBLE_DOOR, direction = oppDir)
+                        }
+                    }
                 } else {
                     gridCopy[x][y] = GridComponent(tool)
+                    if (tool == ComponentType.DOUBLE_DOOR) {
+                        val dir = gridCopy[x][y].direction
+                        val dx = Physical.getDx(dir)
+                        val dy = Physical.getDy(dir)
+                        val nx = x + dx
+                        val ny = y + dy
+                        if (nx in 0 until actualWidth && ny in 0 until actualHeight) {
+                            val oppDir = when (dir) {
+                                Direction.UP -> Direction.DOWN
+                                Direction.DOWN -> Direction.UP
+                                Direction.LEFT -> Direction.RIGHT
+                                Direction.RIGHT -> Direction.LEFT
+                            }
+                            gridCopy[nx][ny] = GridComponent(type = ComponentType.DOUBLE_DOOR, direction = oppDir)
+                        }
+                    }
                 }
             }
 

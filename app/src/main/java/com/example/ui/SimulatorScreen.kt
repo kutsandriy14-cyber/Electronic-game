@@ -76,6 +76,14 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
                 .padding(16.dp)
                 .background(Color(0xDD2A2A35), shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
                 .border(1.dp, Color(0x33FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            event.changes.forEach { it.consume() }
+                        }
+                    }
+                }
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -202,6 +210,67 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
                         Text(text = "NO", fontSize = 11.sp, color = Color(0xFF00FF00), fontWeight = FontWeight.Bold)
                     }
                 }
+
+                Divider(color = Color(0x3300FFCC))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0x1A00FFCC), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                        .border(1.dp, Color(0x6600FFCC), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = if (state.appLanguage == AppLanguage.RU) "[ ПАРАМЕТРЫ СИСТЕМЫ ]" else "[ SYSTEM CORES HUD ]",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF00FFCC),
+                        letterSpacing = 1.sp
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
+                        val activeCpuCores = if (state.isSimulationRunning) (1 + mcuCount) else 1
+                        Text(text = if (state.appLanguage == AppLanguage.RU) "Ядра процессора" else "CPU Cores", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                        Text(text = "$activeCpuCores cores", fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
+                        val cpuFrequencyMhz = if (state.isSimulationRunning) {
+                            val baseFreq = 80.0f + (mcuCount * 40.0f)
+                            val drift = ((System.currentTimeMillis() % 500) - 250) / 1000f
+                            baseFreq + drift
+                        } else {
+                            0.0f
+                        }
+                        Text(text = if (state.appLanguage == AppLanguage.RU) "МГц процессора" else "CPU Clock", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                        Text(text = if (cpuFrequencyMhz > 0f) String.format(Locale.US, "%.2f MHz", cpuFrequencyMhz) else "0.00 MHz", fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
+                        val ramUsageMb = if (state.isSimulationRunning) {
+                            val baseRam = 142.4f + (state.width * state.height * 0.05f) + (mcuCount * 12.8f)
+                            val drift = ((System.currentTimeMillis() % 1000) - 500) / 1500f
+                            baseRam + drift
+                        } else {
+                            12.2f + (state.width * state.height * 0.01f)
+                        }
+                        Text(text = if (state.appLanguage == AppLanguage.RU) "Выделено ОЗУ" else "RAM Allocated", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                        Text(text = String.format(Locale.US, "%.1f MB", ramUsageMb), fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
 
@@ -214,6 +283,14 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
                 .widthIn(max = 800.dp)
                 .background(Color(0xD2121215), shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
                 .border(1.dp, Color(0x22FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            event.changes.forEach { it.consume() }
+                        }
+                    }
+                }
                 .padding(8.dp)
         ) {
             BottomToolBar(
@@ -529,31 +606,64 @@ fun CircuitGridCanvas(
 
                 for (x in visibleStartX until minOf(visibleEndX, actualGridWidth)) {
                     for (y in visibleStartY until minOf(visibleEndY, actualGridHeight)) {
-                        if (grid[x][y].type != ComponentType.EMPTY) {
+                        val comp = grid[x][y]
+                        if (comp.type != ComponentType.EMPTY) {
                             drawContext.canvas.save()
                             drawContext.transform.translate(x * baseCellSize, y * baseCellSize)
                             
-                            // Apply Rotation (omit for symmetric/multi-connection wires to ensure flawless drawing)
-                            val compType = grid[x][y].type
-                            val isWire = compType == ComponentType.WIRE_ANY || 
-                                         compType == ComponentType.SUPERCONDUCTOR || 
-                                         compType == ComponentType.HIGH_VOLTAGE_CABLE || 
-                                         compType == ComponentType.FIBER_OPTIC
-                            val angle = if (isWire) {
-                                0f
-                            } else {
-                                when(grid[x][y].direction) {
-                                    Direction.UP -> 0f
-                                    Direction.RIGHT -> 90f
-                                    Direction.DOWN -> 180f
-                                    Direction.LEFT -> 270f
+                            if (scale < 0.35f) {
+                                // High-Performance LOD Draw Call Bypassing Heavy Rendering for zoomed out states
+                                val cat = comp.type.category
+                                val color = when {
+                                    comp.isOverloaded -> Color(0xFFFF3366)
+                                    comp.type == ComponentType.URANIUM -> {
+                                        if (comp.temperature > 1000f) Color(0xFFFF4500) else Color(0xFF76FF03)
+                                    }
+                                    cat.name == "POWER" || comp.type == ComponentType.NUCLEAR_REACTOR -> {
+                                        if (comp.isPowered) Color(0xFFFF9800) else Color(0xFFD32F2F)
+                                    }
+                                    cat.name == "WIRE" -> {
+                                        if (comp.isPowered) Color(0xFF00FFCC) else Color(0xFF49454F)
+                                    }
+                                    cat.name == "OUTPUTS" -> {
+                                        if (comp.isPowered) Color(0xFFFFEB3B) else Color(0xFF5D4037)
+                                    }
+                                    cat.name == "LOGIC" -> {
+                                        if (comp.isPowered) Color(0xFFE040FB) else Color(0xFF7B1FA2)
+                                    }
+                                    cat.name == "MATERIALS" -> {
+                                        if (comp.type == ComponentType.WATER || comp.type == ComponentType.INFINITE_WATER) Color(0xFF03A9F4)
+                                        else if (comp.type == ComponentType.LAVA || comp.type == ComponentType.INFINITE_LAVA) Color(0xFFF44336)
+                                        else if (comp.type == ComponentType.STEAM) Color(0xAAE0E0E0)
+                                        else Color(0xFF795548)
+                                    }
+                                    else -> if (comp.isPowered) Color(0xFF00FFCC) else Color(0xFF49454F)
                                 }
+                                drawRect(color = color, size = Size(baseCellSize, baseCellSize))
+                                drawRect(color = Color(0x33FFFFFF), size = Size(baseCellSize, baseCellSize), style = Stroke(width = 1f))
+                            } else {
+                                // Apply Rotation (omit for symmetric/multi-connection wires to ensure flawless drawing)
+                                val compType = comp.type
+                                val isWire = compType == ComponentType.WIRE_ANY || 
+                                             compType == ComponentType.SUPERCONDUCTOR || 
+                                             compType == ComponentType.HIGH_VOLTAGE_CABLE || 
+                                             compType == ComponentType.FIBER_OPTIC
+                                val angle = if (isWire) {
+                                    0f
+                                } else {
+                                    when(comp.direction) {
+                                        Direction.UP -> 0f
+                                        Direction.RIGHT -> 90f
+                                        Direction.DOWN -> 180f
+                                        Direction.LEFT -> 270f
+                                    }
+                                }
+                                if (angle != 0f) {
+                                    drawContext.transform.rotate(angle, Offset(baseCellSize/2, baseCellSize/2))
+                                }
+                                
+                                com.example.engine.TabletRender.drawComponent(this, grid, x, y, actualGridWidth, actualGridHeight, comp, baseCellSize)
                             }
-                            if (angle != 0f) {
-                                drawContext.transform.rotate(angle, Offset(baseCellSize/2, baseCellSize/2))
-                            }
-                            
-                            com.example.engine.TabletRender.drawComponent(this, grid, x, y, actualGridWidth, actualGridHeight, grid[x][y], baseCellSize)
                             drawContext.canvas.restore()
                         }
                     }
@@ -1091,55 +1201,80 @@ fun DrawScope.drawComponent(grid: Array<Array<GridComponent>>, x: Int, y: Int, w
 
 @Composable
 fun BottomToolBar(lang: AppLanguage, selectedCategory: ComponentCategory, selectedTool: ComponentType, onCategorySelected: (ComponentCategory) -> Unit, onToolSelected: (ComponentType) -> Unit) {
+    var isCollapsed by remember { mutableStateOf(false) }
+    
     Column(modifier = Modifier.background(Color.Transparent)) {
-        ScrollableTabRow(
-            selectedTabIndex = ComponentCategory.values().indexOf(selectedCategory),
-            containerColor = Color.Transparent,
-            contentColor = Color.White,
-            indicator = { tabPositions ->
-                androidx.compose.material3.TabRowDefaults.Indicator(
-                    modifier = Modifier.tabIndicatorOffset(tabPositions[ComponentCategory.values().indexOf(selectedCategory)]),
-                    color = Color(0xFF00FFCC),
-                    height = 3.dp
-                )
-            },
-            divider = {},
-            edgePadding = 16.dp
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            ComponentCategory.values().forEachIndexed { index, category ->
-                Tab(
-                    selected = selectedCategory == category,
-                    onClick = { onCategorySelected(category) },
-                    text = { 
-                        Text(
-                            Lang.getCategoryName(category, lang), 
-                            fontSize = 13.sp, 
-                            fontWeight = if (selectedCategory == category) FontWeight.Bold else FontWeight.Medium,
-                            color = if (selectedCategory == category) Color(0xFF00FFCC) else Color(0xFFAAAAAA)
-                        ) 
+            Box(modifier = Modifier.weight(1f)) {
+                ScrollableTabRow(
+                    selectedTabIndex = ComponentCategory.values().indexOf(selectedCategory),
+                    containerColor = Color.Transparent,
+                    contentColor = Color.White,
+                    indicator = { tabPositions ->
+                        androidx.compose.material3.TabRowDefaults.Indicator(
+                            modifier = Modifier.tabIndicatorOffset(tabPositions[ComponentCategory.values().indexOf(selectedCategory)]),
+                            color = Color(0xFF00FFCC),
+                            height = 3.dp
+                        )
+                    },
+                    divider = {},
+                    edgePadding = 16.dp
+                ) {
+                    ComponentCategory.values().forEachIndexed { index, category ->
+                        Tab(
+                            selected = selectedCategory == category,
+                            onClick = { 
+                                onCategorySelected(category) 
+                                isCollapsed = false
+                            },
+                            text = { 
+                                Text(
+                                    Lang.getCategoryName(category, lang), 
+                                    fontSize = 13.sp, 
+                                    fontWeight = if (selectedCategory == category) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selectedCategory == category) Color(0xFF00FFCC) else Color(0xFFAAAAAA)
+                                ) 
+                            }
+                        )
                     }
+                }
+            }
+            
+            IconButton(
+                onClick = { isCollapsed = !isCollapsed },
+                modifier = Modifier.padding(end = 8.dp)
+            ) {
+                Icon(
+                    imageVector = if (isCollapsed) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                    contentDescription = "Toggle Menu",
+                    tint = Color(0xFF00FFCC)
                 )
             }
         }
         
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        val componentsInCategory = ComponentType.values().filter { it.category == selectedCategory }
-        
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 72.dp),
-            modifier = Modifier.height(195.dp).padding(horizontal = 8.dp),
-            contentPadding = PaddingValues(bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(componentsInCategory) { type ->
-                ToolButton(
-                    icon = getIconForType(type),
-                    text = Lang.getComponentDisplayName(type, lang),
-                    isSelected = selectedTool == type,
-                    onClick = { onToolSelected(type) }
-                )
+        if (!isCollapsed) {
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            val componentsInCategory = ComponentType.values().filter { it.category == selectedCategory }
+            
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 72.dp),
+                modifier = Modifier.height(195.dp).padding(horizontal = 8.dp),
+                contentPadding = PaddingValues(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(componentsInCategory) { type ->
+                    ToolButton(
+                        icon = getIconForType(type),
+                        text = Lang.getComponentDisplayName(type, lang),
+                        isSelected = selectedTool == type,
+                        onClick = { onToolSelected(type) }
+                    )
+                }
             }
         }
     }
@@ -1248,6 +1383,7 @@ fun getIconForType(type: ComponentType): ImageVector {
         ComponentType.FLUID_DRAIN, ComponentType.VOID_HOLE -> Icons.Default.HighlightOff
         ComponentType.CONVEYOR_BELT -> Icons.Default.LinearScale
         ComponentType.PISTON -> Icons.Default.ArrowUpward
+        ComponentType.DOUBLE_DOOR -> Icons.Default.MeetingRoom
         else -> {
             when (type.category) {
                 ComponentCategory.LOGIC -> Icons.Default.AccountTree

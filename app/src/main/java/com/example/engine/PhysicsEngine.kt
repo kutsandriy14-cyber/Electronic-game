@@ -21,8 +21,11 @@ object PhysicsEngine {
         return Fluid.isPassable(type)
     }
 
-    private fun isMobileParticle(type: ComponentType): Boolean {
-        return FunctionalEngine.isMobileParticle(type)
+    private fun isMobileParticle(comp: GridComponent): Boolean {
+        if (comp.type == ComponentType.URANIUM && comp.temperature > 1000f) {
+            return true
+        }
+        return FunctionalEngine.isMobileParticle(comp.type)
     }
 
     private fun canSqueeze(grid: Array<Array<GridComponent>>, x1: Int, y1: Int, x2: Int, y2: Int, width: Int, height: Int): Boolean {
@@ -51,20 +54,26 @@ object PhysicsEngine {
                 if (!moved[x][y]) {
                     val comp = prevGrid[x][y]
                     
-                    if (isMobileParticle(comp.type)) {
+                    if (isMobileParticle(comp)) {
                         var newX = x
                         var newY = y
                         var didMove = false
                         
                         val goesUp = Fluid.goesUp(comp.type)
                         val dirY = if (goesUp) -1 else 1
-                        val flowChance = Fluid.getFlowChance(comp.type)
+                        val flowChance = if (comp.type == ComponentType.URANIUM) 0.5 else Fluid.getFlowChance(comp.type).toDouble()
 
-                        if (y + dirY in 0 until height && grid[x][y + dirY].type == ComponentType.EMPTY) {
-                            newY = y + dirY
+                        var testY = y + dirY
+                        while (testY in 0 until height && 
+                               grid[x][testY].type == ComponentType.DOUBLE_DOOR && 
+                               grid[x][testY].isPowered) {
+                            testY += dirY
+                        }
+                        if (testY in 0 until height && grid[x][testY].type == ComponentType.EMPTY) {
+                            newY = testY
                             didMove = true
                         } else if (y + dirY in 0 until height) {
-                            val isFluid = Fluid.isFluid(comp.type)
+                            val isFluid = Fluid.isFluid(comp.type) || (comp.type == ComponentType.URANIUM && comp.temperature > 1000f)
                             val isPowder = comp.type == ComponentType.SAND || comp.type == ComponentType.DIRT || comp.type == ComponentType.MAGIC_DUST || comp.type == ComponentType.ICE
                             
                             val blockBelow = grid[x][y + dirY].type
@@ -100,12 +109,26 @@ object PhysicsEngine {
                                 
                                 // If diagonal-down is blocked, spread flat horizontally
                                 if (!diagonalMoved) {
-                                    if (x + dir1 in 0 until width && grid[x + dir1][y].type == ComponentType.EMPTY) {
-                                        newX = x + dir1
+                                    var testX2 = x + dir1
+                                    while (testX2 in 0 until width && 
+                                           grid[testX2][y].type == ComponentType.DOUBLE_DOOR && 
+                                           grid[testX2][y].isPowered) {
+                                        testX2 += dir1
+                                    }
+                                    if (testX2 in 0 until width && grid[testX2][y].type == ComponentType.EMPTY) {
+                                        newX = testX2
                                         didMove = true
-                                    } else if (x + dir2 in 0 until width && grid[x + dir2][y].type == ComponentType.EMPTY) {
-                                        newX = x + dir2
-                                        didMove = true
+                                    } else {
+                                        var testX3 = x + dir2
+                                        while (testX3 in 0 until width && 
+                                               grid[testX3][y].type == ComponentType.DOUBLE_DOOR && 
+                                               grid[testX3][y].isPowered) {
+                                            testX3 += dir2
+                                        }
+                                        if (testX3 in 0 until width && grid[testX3][y].type == ComponentType.EMPTY) {
+                                            newX = testX3
+                                            didMove = true
+                                        }
                                     }
                                 }
                             } else if (isPowder) {

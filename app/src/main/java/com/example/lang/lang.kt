@@ -306,6 +306,7 @@ object Lang {
             ComponentType.CONVEYOR_BELT -> if (lang == AppLanguage.RU) "Конвейер" else "Конвеєр"
             ComponentType.MAGNET -> if (lang == AppLanguage.RU) "Магнит" else "Магніт"
             ComponentType.PISTON -> if (lang == AppLanguage.RU) "Поршень" else "Поршень"
+            ComponentType.DOUBLE_DOOR -> if (lang == AppLanguage.RU) "Двустор. Дверь" else "Двосторонні Двері"
             ComponentType.KEYPAD_4X4 -> if (lang == AppLanguage.RU) "Клавиатура 4x4" else "Клавіатура 4x4"
             ComponentType.JOYSTICK -> if (lang == AppLanguage.RU) "Джойстик" else "Джойстик"
             ComponentType.ACCELEROMETER -> if (lang == AppLanguage.RU) "Акселерометр" else "Акселерометр"
