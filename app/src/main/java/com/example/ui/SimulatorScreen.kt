@@ -62,6 +62,7 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val savedSchemes by viewModel.savedSchemes.collectAsStateWithLifecycle()
     var telemetryState by remember { mutableStateOf("FULL") } // "FULL", "COMPACT", "HIDDEN"
+    var telemetryTab by remember { mutableStateOf("ELECTR") } // "ELECTR", "SIM", "PHONE"
 
     val context = LocalContext.current
     var deviceCores by remember { mutableIntStateOf(Runtime.getRuntime().availableProcessors()) }
@@ -282,7 +283,7 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 80.dp, end = 16.dp)
-                    .width(if (telemetryState == "COMPACT") 180.dp else 220.dp)
+                    .width(if (telemetryState == "COMPACT") 180.dp else 230.dp)
                     .background(Color(0xD2121215), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
                     .border(1.dp, Color(0x3300FFCC), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
                     .padding(10.dp)
@@ -339,156 +340,187 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
                         }
                     }
                     
-                    Divider(color = Color(0x22FFFFFF))
+                    HorizontalDivider(color = Color(0x22FFFFFF))
                     
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(text = if (state.appLanguage == AppLanguage.RU) "Вольтаж" else "Voltage", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                        Text(text = String.format(Locale.US, "%.1f V", state.telemetry.totalVoltage), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(text = if (state.appLanguage == AppLanguage.RU) "Ток" else "Current", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                        Text(text = String.format(Locale.US, "%.0f mA", state.telemetry.totalCurrent), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-
-                    if (telemetryState == "FULL") {
+                    if (telemetryState == "COMPACT") {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(text = if (state.appLanguage == AppLanguage.RU) "Мощность" else "Total Power", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                            Text(text = String.format(Locale.US, "%.2f W", state.telemetry.totalPower), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(text = if (state.appLanguage == AppLanguage.RU) "Вольтаж" else if (state.appLanguage == AppLanguage.UK) "Вольтаж" else "Voltage", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                            Text(text = String.format(Locale.US, "%.1f V", state.telemetry.totalVoltage), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(text = if (state.appLanguage == AppLanguage.RU) "Коротк. замык." else "Short Circuit", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                            if (state.telemetry.isShortCircuit) {
-                                Text(text = "YES", fontSize = 10.sp, color = Color(0xFFFF3366), fontWeight = FontWeight.Bold)
-                            } else {
-                                Text(text = "NO", fontSize = 10.sp, color = Color(0xFF00FF00), fontWeight = FontWeight.Bold)
-                            }
+                            Text(text = if (state.appLanguage == AppLanguage.RU) "Ток" else if (state.appLanguage == AppLanguage.UK) "Струм" else "Current", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                            Text(text = String.format(Locale.US, "%.0f mA", state.telemetry.totalCurrent), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
-
-                        Divider(color = Color(0x3300FFCC))
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color(0x1A00FFCC), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                                .border(1.dp, Color(0x6600FFCC), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                                .padding(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                    } else {
+                        // FULL view with premium high-tech tab design
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text(
-                                text = if (state.appLanguage == AppLanguage.RU) "[ ПАРАМЕТРЫ СИСТЕМЫ ]" else "[ SYSTEM CORES HUD ]",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF00FFCC),
-                                letterSpacing = 1.sp
-                            )
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                                val activeCpuCores = if (state.isSimulationRunning) (1 + mcuCount) else 1
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "Ядра процессора" else "CPU Cores", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = "$activeCpuCores cores", fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                                val cpuFrequencyMhz = if (state.isSimulationRunning) {
-                                    val baseFreq = 80.0f + (mcuCount * 40.0f)
-                                    val drift = ((System.currentTimeMillis() % 500) - 250) / 1000f
-                                    baseFreq + drift
-                                } else {
-                                    0.0f
+                            listOf("ELECTR", "SIM", "PHONE").forEach { tab ->
+                                val isSelected = telemetryTab == tab
+                                val tabIcon = when (tab) {
+                                    "ELECTR" -> "⚡"
+                                    "SIM" -> "⚙️"
+                                    else -> "📱"
                                 }
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "МГц процессора" else "CPU Clock", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = if (cpuFrequencyMhz > 0f) String.format(Locale.US, "%.2f MHz", cpuFrequencyMhz) else "0.00 MHz", fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                                val ramUsageMb = if (state.isSimulationRunning) {
-                                    val baseRam = 142.4f + (state.width * state.height * 0.05f) + (mcuCount * 12.8f)
-                                    val drift = ((System.currentTimeMillis() % 1000) - 500) / 1500f
-                                    baseRam + drift
-                                } else {
-                                    12.2f + (state.width * state.height * 0.01f)
+                                val tabLabel = when (tab) {
+                                    "ELECTR" -> if (state.appLanguage == AppLanguage.RU) "Схема" else if (state.appLanguage == AppLanguage.UK) "Схема" else "Circuit"
+                                    "SIM" -> if (state.appLanguage == AppLanguage.RU) "Движок" else if (state.appLanguage == AppLanguage.UK) "Двигун" else "Engine"
+                                    else -> if (state.appLanguage == AppLanguage.RU) "Железо" else if (state.appLanguage == AppLanguage.UK) "Залізо" else "Phone"
                                 }
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "Выделено ОЗУ" else "RAM Allocated", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = String.format(Locale.US, "%.1f MB", ramUsageMb), fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(
+                                            color = if (isSelected) Color(0x2600FFCC) else Color(0x0AFFFFFF),
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+                                        )
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (isSelected) Color(0xFF00FFCC) else Color(0x11FFFFFF),
+                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+                                        )
+                                        .clickable { telemetryTab = tab }
+                                        .padding(vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(text = tabIcon, fontSize = 10.sp)
+                                        Text(
+                                            text = tabLabel,
+                                            fontSize = 7.5.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) Color(0xFF00FFCC) else Color(0xFFAAAAAA)
+                                        )
+                                    }
+                                }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(4.dp))
                         HorizontalDivider(color = Color(0x22FFFFFF))
-                        Spacer(modifier = Modifier.height(4.dp))
 
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color(0x1A00E1FF), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                                .border(1.dp, Color(0x6600E1FF), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                                .padding(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = if (state.appLanguage == AppLanguage.RU) "[ ЖЕЛЕЗО ТЕЛЕФОНА ]" else if (state.appLanguage == AppLanguage.UK) "[ ЗАЛІЗО ТЕЛЕФОНУ ]" else "[ PHONE HARDWARE HUD ]",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF00E1FF),
-                                letterSpacing = 1.sp
-                            )
+                        when (telemetryTab) {
+                            "ELECTR" -> {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Вольтаж" else if (state.appLanguage == AppLanguage.UK) "Вольтаж" else "Voltage", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    Text(text = String.format(Locale.US, "%.1f V", state.telemetry.totalVoltage), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "Ядра ЦП телефона" else if (state.appLanguage == AppLanguage.UK) "Ядра ЦП телефону" else "Phone CPU Cores", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = "$deviceCores Cores", fontSize = 11.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Ток" else if (state.appLanguage == AppLanguage.UK) "Струм" else "Current", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    Text(text = String.format(Locale.US, "%.0f mA", state.telemetry.totalCurrent), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Мощность" else if (state.appLanguage == AppLanguage.UK) "Потужність" else "Total Power", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    Text(text = String.format(Locale.US, "%.2f W", state.telemetry.totalPower), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Коротк. замык." else if (state.appLanguage == AppLanguage.UK) "Коротк. замик." else "Short Circuit", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    if (state.telemetry.isShortCircuit) {
+                                        Text(text = "YES", fontSize = 10.sp, color = Color(0xFFFF3366), fontWeight = FontWeight.Bold)
+                                    } else {
+                                        Text(text = "NO", fontSize = 10.sp, color = Color(0xFF00FF00), fontWeight = FontWeight.Bold)
+                                    }
+                                }
                             }
+                            "SIM" -> {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
+                                    val activeCpuCores = if (state.isSimulationRunning) (1 + mcuCount) else 1
+                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Ядра процессора" else if (state.appLanguage == AppLanguage.UK) "Ядра процесора" else "CPU Cores", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    Text(text = "$activeCpuCores Cores", fontSize = 10.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                                }
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "Частота ЦП" else if (state.appLanguage == AppLanguage.UK) "Частота ЦП" else "Phone CPU Freq", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = "$deviceCurrentFreq / $deviceMaxFreq", fontSize = 11.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
-                            }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
+                                    val cpuFrequencyMhz = if (state.isSimulationRunning) {
+                                        val baseFreq = 80.0f + (mcuCount * 40.0f)
+                                        val drift = ((System.currentTimeMillis() % 500) - 250) / 1000f
+                                        baseFreq + drift
+                                    } else {
+                                        0.0f
+                                    }
+                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Частота ЦП" else if (state.appLanguage == AppLanguage.UK) "Частота процесора" else "CPU Clock", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    Text(text = if (cpuFrequencyMhz > 0f) String.format(Locale.US, "%.2f MHz", cpuFrequencyMhz) else "0.00 MHz", fontSize = 10.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                                }
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "ОЗУ игры / Свободно" else if (state.appLanguage == AppLanguage.UK) "ОЗП гри / Вільно" else "Game RAM / Available", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = "$appRamUsedByGame / $deviceAvailRam", fontSize = 11.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
+                                    val ramUsageMb = if (state.isSimulationRunning) {
+                                        val baseRam = 142.4f + (state.width * state.height * 0.05f) + (mcuCount * 12.8f)
+                                        val drift = ((System.currentTimeMillis() % 1000) - 500) / 1500f
+                                        baseRam + drift
+                                    } else {
+                                        12.2f + (state.width * state.height * 0.01f)
+                                    }
+                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Выделено памяти" else if (state.appLanguage == AppLanguage.UK) "Виділено пам'яті" else "RAM Allocated", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    Text(text = String.format(Locale.US, "%.1f MB", ramUsageMb), fontSize = 10.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                                }
                             }
-                            
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "Всего ОЗУ телефона" else if (state.appLanguage == AppLanguage.UK) "Всього ОЗП телефону" else "Phone Total RAM", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = deviceTotalRam, fontSize = 11.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
+                            "PHONE" -> {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Ядра ЦП телефона" else if (state.appLanguage == AppLanguage.UK) "Ядра ЦП телефону" else "Real CPU Cores", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    Text(text = "$deviceCores Cores", fontSize = 10.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Частота ЦП телефона" else if (state.appLanguage == AppLanguage.UK) "Частота ЦП телефону" else "Real CPU Freq", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    Text(text = "$deviceCurrentFreq / $deviceMaxFreq", fontSize = 10.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = if (state.appLanguage == AppLanguage.RU) "ОЗУ игры/Свободно" else if (state.appLanguage == AppLanguage.UK) "ОЗП гри/Вільно" else "Game / Free RAM", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    Text(text = "$appRamUsedByGame / $deviceAvailRam", fontSize = 10.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Всего ОЗУ телефона" else if (state.appLanguage == AppLanguage.UK) "Всього ОЗП телефону" else "Phone Total RAM", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    Text(text = deviceTotalRam, fontSize = 10.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
