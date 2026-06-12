@@ -154,71 +154,181 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
             onCellClicked = { x, y -> viewModel.onCellClicked(x, y) }
         )
 
-        // Top Toolbar Overlay
-        Box(
+        // Top Overlay Controller (Toolbar Controls + Scrolling System Performance HUD)
+        Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(16.dp)
-                .widthIn(max = 600.dp)
-                .fillMaxWidth(0.9f)
-                .background(Color(0xDD2A2A35), shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
-                .border(1.dp, Color(0x33FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            event.changes.forEach { it.consume() }
+                .padding(top = 16.dp, start = 8.dp, end = 8.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // 1. Controls Toolbar
+            Box(
+                modifier = Modifier
+                    .widthIn(max = 600.dp)
+                    .fillMaxWidth(0.95f)
+                    .background(Color(0xDD2A2A35), shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                    .border(1.dp, Color(0x33FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { it.consume() }
+                            }
                         }
                     }
-                }
-                .padding(horizontal = 8.dp, vertical = 6.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
             ) {
-                IconButton(onClick = { viewModel.toggleSimulation() }) { 
-                    Icon(if (state.isSimulationRunning) Icons.Default.Pause else Icons.Default.PlayArrow, "Toggle Simulation", tint = Color(0xFF00FFCC)) 
-                }
-                IconButton(onClick = { viewModel.clearGrid() }) { Icon(Icons.Default.Delete, "Clear", tint = Color(0xFFFF5555)) }
-                
-                Spacer(modifier = Modifier.width(12.dp))
                 Row(
                     modifier = Modifier
-                        .background(Color(0xFF1E1E2E), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                        .border(1.dp, Color(0x22FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    listOf(1, 5, 10, 20).forEach { mul ->
-                        val isSelected = state.timeMultiplier == mul
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    color = if (isSelected) Color(0xFF00FFCC) else Color.Transparent,
-                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                    IconButton(onClick = { viewModel.toggleSimulation() }) { 
+                        Icon(if (state.isSimulationRunning) Icons.Default.Pause else Icons.Default.PlayArrow, "Toggle Simulation", tint = Color(0xFF00FFCC)) 
+                    }
+                    IconButton(onClick = { viewModel.clearGrid() }) { Icon(Icons.Default.Delete, "Clear", tint = Color(0xFFFF5555)) }
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .background(Color(0xFF1E1E2E), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                            .border(1.dp, Color(0x22FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf(1, 5, 10, 20).forEach { mul ->
+                            val isSelected = state.timeMultiplier == mul
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        color = if (isSelected) Color(0xFF00FFCC) else Color.Transparent,
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable { viewModel.setTimeMultiplier(mul) }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${mul}x",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) Color(0xFF1E1E2E) else Color.White
                                 )
-                                .clickable { viewModel.setTimeMultiplier(mul) }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "${mul}x",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected) Color(0xFF1E1E2E) else Color.White
-                            )
+                            }
                         }
                     }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    
+                    IconButton(onClick = { viewModel.showSaveDialog() }) { Icon(Icons.Default.Save, "Save", tint = Color.White) }
+                    IconButton(onClick = { viewModel.showLoadDialog() }) { Icon(Icons.Default.FolderOpen, "Load", tint = Color.White) }
+                    IconButton(onClick = { viewModel.showSettingsDialog() }) { Icon(Icons.Default.Settings, "Settings", tint = Color.White) }
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-                
-                IconButton(onClick = { viewModel.showSaveDialog() }) { Icon(Icons.Default.Save, "Save", tint = Color.White) }
-                IconButton(onClick = { viewModel.showLoadDialog() }) { Icon(Icons.Default.FolderOpen, "Load", tint = Color.White) }
-                IconButton(onClick = { viewModel.showSettingsDialog() }) { Icon(Icons.Default.Settings, "Settings", tint = Color.White) }
+            }
+
+            // 2. Horizontally Swipeable System Performance HUD
+            Row(
+                modifier = Modifier
+                    .widthIn(max = 640.dp)
+                    .fillMaxWidth(0.98f)
+                    .background(Color(0xEE121215), shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                    .border(1.dp, Color(0x4400E1FF), androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                    }
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // --- CARD 1: ELECTRIC HUD ---
+                HudMetricCard(
+                    title = if (state.appLanguage == AppLanguage.RU) "СЕТЬ ПИТАНИЯ" else if (state.appLanguage == AppLanguage.UK) "МЕРЕЖА ЖИВЛЕННЯ" else "POWER GRID",
+                    borderColor = Color(0xFF00FFCC)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MetricItem(label = if (state.appLanguage == AppLanguage.RU) "Напряж:" else "Volt:", value = String.format(Locale.US, "%.1f V", state.telemetry.totalVoltage), valueColor = Color.White)
+                        MetricItem(label = if (state.appLanguage == AppLanguage.RU) "Ток:" else "Curr:", value = String.format(Locale.US, "%.0f mA", state.telemetry.totalCurrent), valueColor = Color.White)
+                        MetricItem(label = if (state.appLanguage == AppLanguage.RU) "Мощность:" else "Power:", value = String.format(Locale.US, "%.2f W", state.telemetry.totalPower), valueColor = Color.White)
+                        MetricItem(
+                            label = if (state.appLanguage == AppLanguage.RU) "КЗ:" else "SC:", 
+                            value = if (state.telemetry.isShortCircuit) "YES" else "NO", 
+                            valueColor = if (state.telemetry.isShortCircuit) Color(0xFFFF3366) else Color(0xFF00FF00)
+                        )
+                    }
+                }
+
+                // --- CARD 2: SYSTEM CORES HUD (GAME) ---
+                val mcus = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
+                val activeCpuCores = if (state.isSimulationRunning) (1 + mcus) else 1
+                val cpuFrequencyMhz = if (state.isSimulationRunning) {
+                    val baseFreq = 80.0f + (mcus * 40.0f)
+                    val drift = ((System.currentTimeMillis() % 500) - 250) / 1000f
+                    baseFreq + drift
+                } else {
+                    0.0f
+                }
+                val ramUsageMb = if (state.isSimulationRunning) {
+                    val baseRam = 142.4f + (state.width * state.height * 0.05f) + (mcus * 12.8f)
+                    val drift = ((System.currentTimeMillis() % 1000) - 500) / 1500f
+                    baseRam + drift
+                } else {
+                    12.2f + (state.width * state.height * 0.01f)
+                }
+
+                HudMetricCard(
+                    title = if (state.appLanguage == AppLanguage.RU) "СИМУЛЯТОР" else if (state.appLanguage == AppLanguage.UK) "СИМУЛЯТОР" else "SIMULATOR",
+                    borderColor = Color(0xFF00FFCC)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MetricItem(label = if (state.appLanguage == AppLanguage.RU) "Ядра:" else "Cores:", value = "$activeCpuCores cores", valueColor = Color(0xFF00FFCC))
+                        MetricItem(label = if (state.appLanguage == AppLanguage.RU) "МГц:" else "Freq:", value = if (cpuFrequencyMhz > 0f) String.format(Locale.US, "%.2f MHz", cpuFrequencyMhz) else "0.00 MHz", valueColor = Color(0xFF00FFCC))
+                        MetricItem(label = if (state.appLanguage == AppLanguage.RU) "Память:" else "RAM:", value = String.format(Locale.US, "%.1f MB", ramUsageMb), valueColor = Color(0xFF00FFCC))
+                    }
+                }
+
+                // --- CARD 3: PHONE CPU HUD ---
+                HudMetricCard(
+                    title = if (state.appLanguage == AppLanguage.RU) "ЦП ТЕЛЕФОНА" else if (state.appLanguage == AppLanguage.UK) "ЦП ПРИСТРОЮ" else "DEVICE CPU",
+                    borderColor = Color(0xFF00E1FF)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MetricItem(label = if (state.appLanguage == AppLanguage.RU) "Ядра:" else "Cores:", value = "$deviceCores cores", valueColor = Color(0xFF00E1FF))
+                        MetricItem(label = if (state.appLanguage == AppLanguage.RU) "Частота:" else "Clock:", value = "$deviceCurrentFreq / $deviceMaxFreq", valueColor = Color(0xFF00E1FF))
+                    }
+                }
+
+                // --- CARD 4: PHONE RAM HUD ---
+                HudMetricCard(
+                    title = if (state.appLanguage == AppLanguage.RU) "ОЗУ УСТРОЙСТВА" else if (state.appLanguage == AppLanguage.UK) "ОЗП ПРИСТРОЮ" else "DEVICE RAM",
+                    borderColor = Color(0xFF00E1FF)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MetricItem(label = if (state.appLanguage == AppLanguage.RU) "Игра:" else "App:", value = appRamUsedByGame, valueColor = Color(0xFF00E1FF))
+                        MetricItem(label = if (state.appLanguage == AppLanguage.RU) "Доступно:" else "Avail:", value = deviceAvailRam, valueColor = Color(0xFF00E1FF))
+                        MetricItem(label = if (state.appLanguage == AppLanguage.RU) "Всего:" else "Total:", value = deviceTotalRam, valueColor = Color(0xFF00E1FF))
+                    }
+                }
             }
         }
 
@@ -375,120 +485,6 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
                                 Text(text = "YES", fontSize = 10.sp, color = Color(0xFFFF3366), fontWeight = FontWeight.Bold)
                             } else {
                                 Text(text = "NO", fontSize = 10.sp, color = Color(0xFF00FF00), fontWeight = FontWeight.Bold)
-                            }
-                        }
-
-                        Divider(color = Color(0x3300FFCC))
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color(0x1A00FFCC), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                                .border(1.dp, Color(0x6600FFCC), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                                .padding(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = if (state.appLanguage == AppLanguage.RU) "[ ПАРАМЕТРЫ СИСТЕМЫ ]" else "[ SYSTEM CORES HUD ]",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF00FFCC),
-                                letterSpacing = 1.sp
-                            )
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                                val activeCpuCores = if (state.isSimulationRunning) (1 + mcuCount) else 1
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "Ядра процессора" else "CPU Cores", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = "$activeCpuCores cores", fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                                val cpuFrequencyMhz = if (state.isSimulationRunning) {
-                                    val baseFreq = 80.0f + (mcuCount * 40.0f)
-                                    val drift = ((System.currentTimeMillis() % 500) - 250) / 1000f
-                                    baseFreq + drift
-                                } else {
-                                    0.0f
-                                }
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "МГц процессора" else "CPU Clock", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = if (cpuFrequencyMhz > 0f) String.format(Locale.US, "%.2f MHz", cpuFrequencyMhz) else "0.00 MHz", fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                                val ramUsageMb = if (state.isSimulationRunning) {
-                                    val baseRam = 142.4f + (state.width * state.height * 0.05f) + (mcuCount * 12.8f)
-                                    val drift = ((System.currentTimeMillis() % 1000) - 500) / 1500f
-                                    baseRam + drift
-                                } else {
-                                    12.2f + (state.width * state.height * 0.01f)
-                                }
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "Выделено ОЗУ" else "RAM Allocated", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = String.format(Locale.US, "%.1f MB", ramUsageMb), fontSize = 11.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-                        HorizontalDivider(color = Color(0x22FFFFFF))
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color(0x1A00E1FF), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                                .border(1.dp, Color(0x6600E1FF), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                                .padding(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = if (state.appLanguage == AppLanguage.RU) "[ ЖЕЛЕЗО ТЕЛЕФОНА ]" else if (state.appLanguage == AppLanguage.UK) "[ ЗАЛІЗО ТЕЛЕФОНУ ]" else "[ PHONE HARDWARE HUD ]",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF00E1FF),
-                                letterSpacing = 1.sp
-                            )
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "Ядра ЦП телефона" else if (state.appLanguage == AppLanguage.UK) "Ядра ЦП телефону" else "Phone CPU Cores", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = "$deviceCores Cores", fontSize = 11.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "Частота ЦП" else if (state.appLanguage == AppLanguage.UK) "Частота ЦП" else "Phone CPU Freq", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = "$deviceCurrentFreq / $deviceMaxFreq", fontSize = 11.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "ОЗУ игры / Свободно" else if (state.appLanguage == AppLanguage.UK) "ОЗП гри / Вільно" else "Game RAM / Available", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = "$appRamUsedByGame / $deviceAvailRam", fontSize = 11.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
-                            }
-                            
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(text = if (state.appLanguage == AppLanguage.RU) "Всего ОЗУ телефона" else if (state.appLanguage == AppLanguage.UK) "Всього ОЗП телефону" else "Phone Total RAM", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                                Text(text = deviceTotalRam, fontSize = 11.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -1627,4 +1623,56 @@ fun getIconForType(type: ComponentType): ImageVector {
 
 // Dialogs 
 // All customized dialogs reside inside com.example.ui.components
+
+
+@Composable
+private fun HudMetricCard(
+    title: String,
+    borderColor: Color,
+    content: @Composable () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .background(Color(0x1B000000), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+            .border(1.dp, borderColor.copy(alpha = 0.5f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = title,
+            fontSize = 8.0.sp,
+            fontWeight = FontWeight.Bold,
+            color = borderColor,
+            letterSpacing = 0.5.sp,
+            fontFamily = FontFamily.Monospace
+        )
+        content()
+    }
+}
+
+@Composable
+private fun MetricItem(
+    label: String,
+    value: String,
+    valueColor: Color
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Text(
+            text = label, 
+            fontSize = 9.sp, 
+            color = Color(0xFFAAAAAA),
+            fontFamily = FontFamily.Monospace
+        )
+        Text(
+            text = value, 
+            fontSize = 9.5.sp, 
+            color = valueColor, 
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
+    }
+}
 
