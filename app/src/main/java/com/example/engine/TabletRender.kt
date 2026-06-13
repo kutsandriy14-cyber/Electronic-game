@@ -35,11 +35,11 @@ object TabletRender {
 
     fun getMaxCap(component: GridComponent): Float {
         val default = when(component.type) { 
-            ComponentType.COIN_CELL -> 100f 
-            ComponentType.BATTERY_PACK -> 10000f 
+            ComponentType.COIN_CELL -> com.example.functional.Battery.DEFAULT_COIN_CELL_CAPACITY 
+            ComponentType.BATTERY_PACK -> com.example.functional.Battery.DEFAULT_BATTERY_PACK_CAPACITY 
             ComponentType.INFINITE_BATTERY -> 9999999f 
             ComponentType.NUCLEAR_REACTOR -> 1000000f 
-            else -> 2500f 
+            else -> com.example.functional.Battery.DEFAULT_BATTERY_CAPACITY 
         }
         val extra = component.extraData
         if (extra.isEmpty()) return default
@@ -73,8 +73,8 @@ object TabletRender {
                         when (type) {
                             ComponentType.WATER, ComponentType.INFINITE_WATER -> Color(0xAA2196F3)
                             ComponentType.LAVA, ComponentType.INFINITE_LAVA -> Color(0xAAFF5722)
-                            ComponentType.OIL -> Color(0xAA212121)
-                            ComponentType.ACID -> Color(0xAA8BC34A)
+                            ComponentType.OIL, ComponentType.INFINITE_OIL -> Color(0xAA212121)
+                            ComponentType.ACID, ComponentType.INFINITE_ACID -> Color(0xAA8BC34A)
                             ComponentType.SAND -> Color(0xFFFFC107)
                             ComponentType.DIRT -> Color(0xFF795548)
                             ComponentType.STONE -> Color(0xFF9E9E9E)
@@ -82,8 +82,8 @@ object TabletRender {
                             ComponentType.WOOD -> Color(0xFF8D6E63)
                             ComponentType.FIRE -> Color(0xFFFF9800)
                             ComponentType.ICE -> Color(0xAA80DEEA)
-                            ComponentType.STEAM -> Color(0xAAE0E0E0)
-                            ComponentType.SLIME -> Color(0xAA00FF00)
+                            ComponentType.STEAM, ComponentType.INFINITE_STEAM -> Color(0xAAE0E0E0)
+                            ComponentType.SLIME, ComponentType.INFINITE_SLIME -> Color(0xAA00FF00)
                             ComponentType.RUBBER -> Color(0xFF424242)
                             ComponentType.DIAMOND -> Color(0xAA00BCD4)
                             ComponentType.COAL -> Color(0xFF3E2723)
@@ -183,13 +183,58 @@ object TabletRender {
                     drawLine(Color(0xFFD0BCFF), start = Offset(cx - padding, cy), end = Offset(cx + padding, cy), strokeWidth=strokeSize*0.5f)
                 }
                 
-                ComponentType.NUCLEAR_REACTOR, ComponentType.WIND_TURBINE, ComponentType.GEOTHERMAL_GENERATOR, ComponentType.HYDRO_GENERATOR, ComponentType.THERMOELECTRIC_GENERATOR, ComponentType.INFINITE_BATTERY -> {
+                ComponentType.NUCLEAR_REACTOR, ComponentType.GEOTHERMAL_GENERATOR, ComponentType.HYDRO_GENERATOR, ComponentType.THERMOELECTRIC_GENERATOR, ComponentType.INFINITE_BATTERY -> {
                     drawRect(
                         brush = greenEnergyBrush,
                         topLeft = Offset(padding, padding), 
                         size = Size(cellSize - padding * 2, cellSize - padding * 2)
                     )
                     drawCircle(Color.Black, radius = Math.max(1f, strokeSize), center = Offset(cx, cy))
+                }
+                
+                ComponentType.WIND_TURBINE -> {
+                    // Draw base mast support stand
+                    drawLine(
+                        color = Color(0xFF90A4AE),
+                        start = Offset(cx, cellSize - padding * 1.5f),
+                        end = Offset(cx, cy),
+                        strokeWidth = strokeSize * 1.5f
+                    )
+                    // Draw nacelle generator block
+                    drawCircle(
+                        color = Color(0xFF607D8B),
+                        radius = cellSize * 0.15f,
+                        center = Offset(cx, cy)
+                    )
+                    
+                    // Rotor blades calculation: if powered, spin the blades!
+                    val angleSpeedRad = if (component.isPowered) {
+                        // Calculate a dynamic angle that rotates over time
+                        val timeSecs = System.currentTimeMillis() / 1000f
+                        timeSecs * 6f
+                    } else {
+                        0f
+                    }
+
+                    val bladeLen = cellSize * 0.35f
+                    for (i in 0..2) {
+                        val angleRad = angleSpeedRad + (i * 120f * (Math.PI / 180f)).toFloat()
+                        val endX = cx + kotlin.math.cos(angleRad) * bladeLen
+                        val endY = cy + kotlin.math.sin(angleRad) * bladeLen
+                        drawLine(
+                            color = Color.White,
+                            start = Offset(cx, cy),
+                            end = Offset(endX, endY),
+                            strokeWidth = strokeSize * 1.2f
+                        )
+                    }
+                    
+                    // Central rotor hub
+                    drawCircle(
+                        color = Color(0xFFECEFF1),
+                        radius = cellSize * 0.08f,
+                        center = Offset(cx, cy)
+                    )
                 }
                 
                 ComponentType.GENERATOR -> {
@@ -1859,8 +1904,8 @@ object TabletRender {
                         val matColor = when (type) {
                             ComponentType.WATER, ComponentType.INFINITE_WATER -> Color(0xAA2196F3)
                             ComponentType.LAVA, ComponentType.INFINITE_LAVA -> Color(0xAAFF5722)
-                            ComponentType.OIL -> Color(0xAA212121)
-                            ComponentType.ACID -> Color(0xAA8BC34A)
+                            ComponentType.OIL, ComponentType.INFINITE_OIL -> Color(0xAA212121)
+                            ComponentType.ACID, ComponentType.INFINITE_ACID -> Color(0xAA8BC34A)
                             ComponentType.SAND -> Color(0xFFFFC107)
                             ComponentType.DIRT -> Color(0xFF795548)
                             ComponentType.STONE -> Color(0xFF9E9E9E)
@@ -1868,14 +1913,18 @@ object TabletRender {
                             ComponentType.WOOD -> Color(0xFF8D6E63)
                             ComponentType.FIRE -> Color(0xFFFF9800)
                             ComponentType.ICE -> Color(0xAA80DEEA)
-                            ComponentType.STEAM -> Color(0xAAE0E0E0)
-                            ComponentType.SLIME -> Color(0xAA00FF00)
+                            ComponentType.STEAM, ComponentType.INFINITE_STEAM -> Color(0xAAE0E0E0)
+                            ComponentType.SLIME, ComponentType.INFINITE_SLIME -> Color(0xAA00FF00)
                             ComponentType.RUBBER -> Color(0xFF424242)
                             ComponentType.DIAMOND -> Color(0xAA00BCD4)
                             ComponentType.COAL -> Color(0xFF3E2723)
                             ComponentType.SPONGE -> Color(0xFFFFEB3B)
-                            ComponentType.GASOLINE -> Color(0xAAFFC107)
-                            ComponentType.LIQUID_NITROGEN -> Color(0xAA4DD0E1)
+                            ComponentType.GASOLINE, ComponentType.INFINITE_GASOLINE -> Color(0xAAFFC107)
+                            ComponentType.LIQUID_NITROGEN, ComponentType.INFINITE_LIQUID_NITROGEN -> Color(0xAA4DD0E1)
+                            ComponentType.HELIUM -> Color(0xAAFF80DF)
+                            ComponentType.HYDROGEN -> Color(0xAA33FFCC)
+                            ComponentType.METHANE -> Color(0xAA7FFF00)
+                            ComponentType.CARBON_DIOXIDE -> Color(0xAA808099)
                             ComponentType.URANIUM -> {
                                 val temp = component.temperature
                                 if (temp <= 100f) {
@@ -1921,7 +1970,14 @@ object TabletRender {
                         } else if (type == ComponentType.DIAMOND) {
                             drawLine(Color.White, start = Offset(cellSize * 0.2f, 0f), end = Offset(cellSize, cellSize * 0.8f), strokeWidth = 1.5f)
                         }
-                        if (type == ComponentType.INFINITE_WATER || type == ComponentType.INFINITE_LAVA) {
+                        if (type == ComponentType.INFINITE_WATER || 
+                            type == ComponentType.INFINITE_LAVA ||
+                            type == ComponentType.INFINITE_OIL ||
+                            type == ComponentType.INFINITE_ACID ||
+                            type == ComponentType.INFINITE_SLIME ||
+                            type == ComponentType.INFINITE_GASOLINE ||
+                            type == ComponentType.INFINITE_LIQUID_NITROGEN ||
+                            type == ComponentType.INFINITE_STEAM) {
                             drawRect(Color.White, topLeft = Offset(padding * 2, padding * 2), size = Size(cellSize - padding * 4, cellSize - padding * 4))
                         }
                         if (type == ComponentType.VOID_HOLE || type == ComponentType.FLUID_DRAIN) {

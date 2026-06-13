@@ -40,7 +40,11 @@ data class SimulatorState(
     val isSimulationRunning: Boolean = true,
     val simulationTick: Long = 0,
     val appLanguage: AppLanguage = AppLanguage.EN,
-    val timeMultiplier: Int = 1 // Acceleration from 1 to 20
+    val timeMultiplier: Int = 1, // Acceleration from 1 to 20
+    val allocatedRamGbytes: Int = 4, // Simulated RAM limit (1 to 16 GB)
+    val allocatedCores: Int = 4,      // Simulated CPU Core count (1 to 8)
+    val clockMhz: Int = 2400,         // Simulated CPU Clock Speed throttling (500 to 3600 MHz)
+    val canvasStyle: String = "dark_neon" // Canvas aesthetic theme: "dark_neon", "blueprint", "oled_black"
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -63,6 +67,10 @@ data class SimulatorState(
         if (isEasterEggActive != other.isEasterEggActive) return false
         if (appLanguage != other.appLanguage) return false
         if (timeMultiplier != other.timeMultiplier) return false
+        if (allocatedRamGbytes != other.allocatedRamGbytes) return false
+        if (allocatedCores != other.allocatedCores) return false
+        if (clockMhz != other.clockMhz) return false
+        if (canvasStyle != other.canvasStyle) return false
         
         // Deep equals last because it is very expensive
         if (!grid.contentDeepEquals(other.grid)) return false
@@ -87,6 +95,10 @@ data class SimulatorState(
         result = 31 * result + simulationTick.hashCode()
         result = 31 * result + appLanguage.hashCode()
         result = 31 * result + timeMultiplier.hashCode()
+        result = 31 * result + allocatedRamGbytes
+        result = 31 * result + allocatedCores
+        result = 31 * result + clockMhz
+        result = 31 * result + canvasStyle.hashCode()
         return result
     }
 }
@@ -106,7 +118,46 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
         initialValue = emptyList()
     )
 
+    companion object {
+        fun getMaxPhysicalRamGb(): Int {
+            return try {
+                val runtime = Runtime.getRuntime()
+                val heapMaxGb = (runtime.maxMemory() / (1024L * 1024L * 1024L)).toInt().coerceIn(1, 48)
+                if (heapMaxGb == 0) {
+                    val heapMaxMb = (runtime.maxMemory() / (1024L * 1024L)).toInt()
+                    when {
+                        heapMaxMb <= 256 -> 2
+                        heapMaxMb <= 512 -> 4
+                        heapMaxMb <= 1024 -> 8
+                        else -> 12
+                    }
+                } else {
+                    heapMaxGb * 2
+                }
+            } catch (e: Exception) {
+                4
+            }
+        }
+
+        fun getPhysicalCpuCores(): Int {
+            return try {
+                Runtime.getRuntime().availableProcessors().coerceIn(1, 16)
+            } catch (e: Exception) {
+                4
+            }
+        }
+    }
+
     init {
+        val detectedCores = getPhysicalCpuCores()
+        val detectedRam = getMaxPhysicalRamGb()
+        _uiState.update { current ->
+            current.copy(
+                allocatedCores = detectedCores,
+                allocatedRamGbytes = detectedRam,
+                clockMhz = 2400
+            )
+        }
         startSimulationLoop()
     }
 
@@ -132,20 +183,51 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
                 var elapsed = 0L
                 if (state.isSimulationRunning) {
                     val startTime = System.currentTimeMillis()
-                    val stepsCount = state.timeMultiplier.coerceIn(1, 20)
+                    
+                    // Physical CPU limits "если я виделил столько то то больше етого лимита не пойдет"
+                    // Each step standardly consumes 200 MHz multiplier cycles.
+                    // Max computed steps per cycle is bottlenecked by state.allocatedCores * state.clockMhz.
+                    val maxAllowedSteps = ((state.allocatedCores * state.clockMhz) / 220).coerceIn(1, 20)
+                    val stepsCount = minOf(state.timeMultiplier, maxAllowedSteps)
+                    
                     var currentGrid = state.grid
                     var currentTelemetry = state.telemetry
                     val accumulatedLogs = mutableListOf<String>()
                     var currentTick = state.simulationTick
                     
                     for (step in 0 until stepsCount) {
-                        val simResult = engine.calculatePower(currentGrid, state.width, state.height, currentTick)
+                        val simResult = engine.calculatePower(
+                            currentGrid, 
+                            state.width, 
+                            state.height, 
+                            currentTick,
+                            ramGb = state.allocatedRamGbytes,
+                            cores = state.allocatedCores
+                        )
                         currentGrid = simResult.grid.map { col -> col.clone() }.toTypedArray()
                         currentTelemetry = simResult.telemetry
                         if (simResult.logs.isNotEmpty()) {
                             accumulatedLogs.addAll(simResult.logs)
                         }
                         currentTick++
+                        
+                        // Core queuing + clock cycle throttling delay simulating physical hardware limits
+                        val coreDelay = when {
+                            state.allocatedCores == 1 -> 15L
+                            state.allocatedCores == 2 -> 6L
+                            state.allocatedCores == 3 -> 3L
+                            else -> 0L
+                        }
+                        val clockDelay = when {
+                            state.clockMhz < 1000 -> 24L
+                            state.clockMhz < 1800 -> 10L
+                            state.clockMhz < 2600 -> 3L
+                            else -> 0L
+                        }
+                        val throttledDelay = coreDelay + clockDelay
+                        if (throttledDelay > 0L) {
+                            delay(throttledDelay)
+                        }
                     }
 
                     _uiState.update { current ->
@@ -162,7 +244,16 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
                     }
                     elapsed = System.currentTimeMillis() - startTime
                 }
-                delay(maxOf(com.example.engine.PhysicsConstants.TICK_DELAY_MS - elapsed, 0L))
+                
+                val clockMhz = state.clockMhz
+                val delayTime = when {
+                    clockMhz >= 3600 -> 24L
+                    clockMhz >= 2400 -> 50L
+                    clockMhz >= 1600 -> 80L
+                    clockMhz >= 1000 -> 140L
+                    else -> 280L // highly-throttled CPU limit
+                }
+                delay(maxOf(delayTime - elapsed, 10L))
             }
         }
     }
@@ -172,7 +263,9 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
     }
 
     fun selectTool(type: ComponentType) {
-        _uiState.update { it.copy(selectedTool = type, selectedCategory = type.category) }
+        _uiState.update { state ->
+            state.copy(selectedTool = type, selectedCategory = type.category)
+        }
     }
     
     fun selectCategory(category: ComponentCategory) {
@@ -369,6 +462,21 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
     fun showSaveDialog() { _uiState.update { it.copy(showSaveDialog = true) } }
     fun showLoadDialog() { _uiState.update { it.copy(showLoadDialog = true) } }
     fun showSettingsDialog() { _uiState.update { it.copy(showSettingsDialog = true) } }
+
+    fun updateHardwareSettings(ramGb: Int, cores: Int, mhz: Int, canvasStyle: String) {
+        _uiState.update { current ->
+            current.copy(
+                allocatedRamGbytes = ramGb.coerceIn(1, 16),
+                allocatedCores = cores.coerceIn(1, 8),
+                clockMhz = mhz.coerceIn(500, 3600),
+                canvasStyle = canvasStyle
+            )
+        }
+    }
+
+    fun dismissSettingsAndApply() {
+        _uiState.update { it.copy(showSettingsDialog = false) }
+    }
 
     fun dismissDialogs() {
         _uiState.update { it.copy(showLoadDialog = false, showSaveDialog = false, showSettingsDialog = false) }

@@ -1,9 +1,12 @@
 package com.example.lang
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.example.model.ComponentCategory
 import com.example.model.ComponentType
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 enum class AppLanguage(val code: String, val displayName: String) {
     EN("en", "English"),
@@ -12,7 +15,41 @@ enum class AppLanguage(val code: String, val displayName: String) {
 }
 
 object Lang {
-    private val translations = mapOf(
+    private val translations = java.util.concurrent.ConcurrentHashMap<AppLanguage, Map<String, String>>()
+
+    fun init(context: Context) {
+        for (lang in AppLanguage.values()) {
+            val map = mutableMapOf<String, String>()
+            try {
+                val fileName = "lang${lang.code.lowercase()}.txt"
+                context.assets.open(fileName).use { inputStream ->
+                    BufferedReader(InputStreamReader(inputStream, "UTF-8")).use { reader ->
+                        var line: String?
+                        while (reader.readLine().also { line = it } != null) {
+                            val trimmed = line!!.trim()
+                            if (trimmed.isEmpty() || trimmed.startsWith("#")) continue
+                            val eq = trimmed.indexOf('=')
+                            if (eq != -1) {
+                                val key = trimmed.substring(0, eq).trim()
+                                val value = trimmed.substring(eq + 1).trim()
+                                map[key] = value
+                            }
+                        }
+                    }
+                }
+                translations[lang] = map
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun t(key: String, lang: AppLanguage): String {
+        return translations[lang]?.get(key) ?: fallbackTranslations[lang]?.get(key) ?: fallbackTranslations[AppLanguage.EN]?.get(key) ?: key
+    }
+
+    // Static fallback dictionary in case dynamic assets haven't initialized yet
+    private val fallbackTranslations = mapOf(
         AppLanguage.EN to mapOf(
             "app_name" to "ElectroSim",
             "simulation" to "Simulation",
@@ -30,7 +67,7 @@ object Lang {
             "analog_ics" to "Analog ICs",
             "advanced_memory" to "Advanced & MCU",
             "materials_fluids" to "Materials & Solids",
-            "hydraulics" to "Hydraulics",
+            "hydraulics" to "Fluids & Gases",
             "telemetry" to "Telemetry",
             "voltage" to "Voltage",
             "current" to "Current",
@@ -57,7 +94,15 @@ object Lang {
             "live_state" to "Live State",
             "schemes_empty" to "No saved schemes yet",
             "enter_name" to "Enter blueprint name",
-            "language" to "App Language"
+            "language" to "App Language",
+            "simulated_ram" to "Hardware RAM Allocation (GB)",
+            "simulated_cores" to "Simulation CPU Core Count",
+            "simulated_mhz" to "Clock Frequency Throttling (MHz)",
+            "canvas_style" to "Canvas Visual Style",
+            "system_limits" to "Simulated Device Limits",
+            "canvas_classic" to "Cosmic Neon Slate",
+            "canvas_blueprint" to "Lab Drafting Blueprint",
+            "canvas_oled" to "Power-Saving OLED Black"
         ),
         AppLanguage.RU to mapOf(
             "app_name" to "ЭлектроСим",
@@ -76,7 +121,7 @@ object Lang {
             "analog_ics" to "Аналоговые ИС",
             "advanced_memory" to "Контроллеры",
             "materials_fluids" to "Твердые блоки",
-            "hydraulics" to "Гидравлика",
+            "hydraulics" to "Жидкости и Газы",
             "telemetry" to "Телеметрия",
             "voltage" to "Напряжение",
             "current" to "Ток",
@@ -103,7 +148,15 @@ object Lang {
             "live_state" to "Состояние",
             "schemes_empty" to "Нет сохраненных схем",
             "enter_name" to "Введите название схемы",
-            "language" to "Язык интерфейса"
+            "language" to "Язык интерфейса",
+            "simulated_ram" to "Выделение ОЗУ устройства (ГБ)",
+            "simulated_cores" to "Ядра процессора для симуляции",
+            "simulated_mhz" to "Лимит тактовой частоты (МГц)",
+            "canvas_style" to "Стиль полотна подложки",
+            "system_limits" to "Лимиты ресурсов (имитация телефона)",
+            "canvas_classic" to "Космический Неоновый Сланец",
+            "canvas_blueprint" to "Инженерный Синий Чертеж",
+            "canvas_oled" to "Черно-белый OLED эконом"
         ),
         AppLanguage.UK to mapOf(
             "app_name" to "ЕлектроСим",
@@ -122,12 +175,12 @@ object Lang {
             "analog_ics" to "Аналогові ІС",
             "advanced_memory" to "Контролери та Пам'ять",
             "materials_fluids" to "Тверді блоки",
-            "hydraulics" to "Гідравліка",
+            "hydraulics" to "Рідини та Гази",
             "telemetry" to "Телеметрія",
             "voltage" to "Напруга",
             "current" to "Струм",
             "power" to "Потужність",
-            "short_circuit" to "КОРОТКЕ ЗАМИКАННЯ!",
+            "short_circuit" to "КОРОТКЕ ЗАМЫКАНИЕ!",
             "active_scripts" to "Активні скрипти",
             "mcu_logs" to "Логи МК (SSM)",
             "inspect" to "Огляд елемента",
@@ -140,7 +193,7 @@ object Lang {
             "import_export" to "Код схеми",
             "copy" to "Копіювати",
             "paste" to "Імпортувати",
-            "delete" to "Видалити",
+            "delete" to "Вилучити",
             "cancel" to "Скасувати",
             "close" to "Закрити",
             "edit_properties" to "Властивості елемента",
@@ -149,13 +202,17 @@ object Lang {
             "live_state" to "Стан",
             "schemes_empty" to "Немає збережених схем",
             "enter_name" to "Введіть назву схеми",
-            "language" to "Мова інтерфейсу"
+            "language" to "Мова інтерфейсу",
+            "simulated_ram" to "Виділення ОЗП пристрою (ГБ)",
+            "simulated_cores" to "Ядра процесора для симуляції",
+            "simulated_mhz" to "Частота тактового генератора (МГц)",
+            "canvas_style" to "Стиль фонового полотна",
+            "system_limits" to "Обмеження ресурсів (імітація телефону)",
+            "canvas_classic" to "Космічний Неоновий Сланець",
+            "canvas_blueprint" to "Інженерний Синій Кресляр",
+            "canvas_oled" to "Чорно-білий OLED економ"
         )
     )
-
-    fun t(key: String, lang: AppLanguage): String {
-        return translations[lang]?.get(key) ?: translations[AppLanguage.EN]?.get(key) ?: key
-    }
 
     fun getCategoryName(category: ComponentCategory, lang: AppLanguage): String {
         return when (category) {
@@ -288,6 +345,10 @@ object Lang {
             ComponentType.FIRE -> if (lang == AppLanguage.RU) "Огонь" else "Вогонь"
             ComponentType.ICE -> if (lang == AppLanguage.RU) "Лед" else "Лід"
             ComponentType.STEAM -> if (lang == AppLanguage.RU) "Пар" else "Пара"
+            ComponentType.HELIUM -> if (lang == AppLanguage.RU) "Гелий 🎈" else "Гелій 🎈"
+            ComponentType.HYDROGEN -> if (lang == AppLanguage.RU) "Водород 🔥" else "Водень 🔥"
+            ComponentType.METHANE -> if (lang == AppLanguage.RU) "Метан 💨" else "Метан 💨"
+            ComponentType.CARBON_DIOXIDE -> if (lang == AppLanguage.RU) "Углекислый газ" else "Вуглекислий газ"
             ComponentType.SLIME -> if (lang == AppLanguage.RU) "Слизь" else "Слиз"
             ComponentType.RUBBER -> if (lang == AppLanguage.RU) "Резина" else "Гума"
             ComponentType.DIAMOND -> if (lang == AppLanguage.RU) "Алмаз" else "Алмаз"
@@ -301,6 +362,12 @@ object Lang {
             ComponentType.INFINITE_BATTERY -> if (lang == AppLanguage.RU) "Бескон. батар." else "Нескінченна батар."
             ComponentType.INFINITE_WATER -> if (lang == AppLanguage.RU) "Родник воды" else "Джерело води"
             ComponentType.INFINITE_LAVA -> if (lang == AppLanguage.RU) "Источник лавы" else "Джерело лави"
+            ComponentType.INFINITE_OIL -> if (lang == AppLanguage.RU) "Источник масла" else "Джерело мастила"
+            ComponentType.INFINITE_ACID -> if (lang == AppLanguage.RU) "Источник кислоты" else "Джерело кислоти"
+            ComponentType.INFINITE_SLIME -> if (lang == AppLanguage.RU) "Источник слизи" else "Джерело слизу"
+            ComponentType.INFINITE_GASOLINE -> if (lang == AppLanguage.RU) "Источник бензина" else "Джерело бензину"
+            ComponentType.INFINITE_LIQUID_NITROGEN -> if (lang == AppLanguage.RU) "Источник азота" else "Джерело азоту"
+            ComponentType.INFINITE_STEAM -> if (lang == AppLanguage.RU) "Источник пара" else "Джерело пари"
             ComponentType.FLUID_DRAIN -> if (lang == AppLanguage.RU) "Слив" else "Злив"
             ComponentType.VOID_HOLE -> if (lang == AppLanguage.RU) "Пустота" else "Порожнеча"
             ComponentType.CONVEYOR_BELT -> if (lang == AppLanguage.RU) "Конвейер" else "Конвеєр"

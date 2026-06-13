@@ -63,6 +63,7 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
     val savedSchemes by viewModel.savedSchemes.collectAsStateWithLifecycle()
     var telemetryState by remember { mutableStateOf("FULL") } // "FULL", "COMPACT", "HIDDEN"
     var telemetryTab by remember { mutableStateOf("ELECTR") } // "ELECTR", "SIM", "PHONE"
+    var showWikiDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     var deviceCores by remember { mutableIntStateOf(Runtime.getRuntime().availableProcessors()) }
@@ -152,76 +153,24 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
             height = state.height,
             tick = state.simulationTick,
             selectedTool = state.selectedTool,
+            canvasStyle = state.canvasStyle,
             onCellClicked = { x, y -> viewModel.onCellClicked(x, y) }
         )
 
         // Top Toolbar Overlay
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(16.dp)
-                .widthIn(max = 600.dp)
-                .fillMaxWidth(0.9f)
-                .background(Color(0xDD2A2A35), shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
-                .border(1.dp, Color(0x33FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            event.changes.forEach { it.consume() }
-                        }
-                    }
-                }
-                .padding(horizontal = 8.dp, vertical = 6.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                IconButton(onClick = { viewModel.toggleSimulation() }) { 
-                    Icon(if (state.isSimulationRunning) Icons.Default.Pause else Icons.Default.PlayArrow, "Toggle Simulation", tint = Color(0xFF00FFCC)) 
-                }
-                IconButton(onClick = { viewModel.clearGrid() }) { Icon(Icons.Default.Delete, "Clear", tint = Color(0xFFFF5555)) }
-                
-                Spacer(modifier = Modifier.width(12.dp))
-                Row(
-                    modifier = Modifier
-                        .background(Color(0xFF1E1E2E), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                        .border(1.dp, Color(0x22FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    listOf(1, 5, 10, 20).forEach { mul ->
-                        val isSelected = state.timeMultiplier == mul
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    color = if (isSelected) Color(0xFF00FFCC) else Color.Transparent,
-                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
-                                )
-                                .clickable { viewModel.setTimeMultiplier(mul) }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "${mul}x",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected) Color(0xFF1E1E2E) else Color.White
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                
-                IconButton(onClick = { viewModel.showSaveDialog() }) { Icon(Icons.Default.Save, "Save", tint = Color.White) }
-                IconButton(onClick = { viewModel.showLoadDialog() }) { Icon(Icons.Default.FolderOpen, "Load", tint = Color.White) }
-                IconButton(onClick = { viewModel.showSettingsDialog() }) { Icon(Icons.Default.Settings, "Settings", tint = Color.White) }
-            }
-        }
+        UIEngine.TopToolBar(
+            lang = state.appLanguage,
+            isSimulationRunning = state.isSimulationRunning,
+            timeMultiplier = state.timeMultiplier,
+            onToggleSimulation = { viewModel.toggleSimulation() },
+            onClearGrid = { viewModel.clearGrid() },
+            onSetTimeMultiplier = { viewModel.setTimeMultiplier(it) },
+            onShowWiki = { showWikiDialog = true },
+            onShowSave = { viewModel.showSaveDialog() },
+            onShowLoad = { viewModel.showLoadDialog() },
+            onShowSettings = { viewModel.showSettingsDialog() },
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
 
         // Logs Overlay
         if (state.logs.isNotEmpty()) {
@@ -250,283 +199,23 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
         }
 
         // High-Tech Telemetry HUD Overlay
-        if (telemetryState == "HIDDEN") {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 80.dp, end = 16.dp)
-                    .background(Color(0xD2121215), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                    .border(1.dp, Color(0x9900FFCC), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                    .clickable { telemetryState = "FULL" }
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Visibility,
-                        contentDescription = "Show Telemetry",
-                        tint = Color(0xFF00FFCC),
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = if (state.appLanguage == AppLanguage.RU) "ТЕЛЕМЕТРИЯ [ + ]" else if (state.appLanguage == AppLanguage.UK) "ТЕЛЕМЕТРІЯ [ + ]" else "TELEMETRY [ + ]",
-                        fontSize = 11.sp,
-                        color = Color(0xFF00FFCC),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 80.dp, end = 16.dp)
-                    .width(if (telemetryState == "COMPACT") 180.dp else 230.dp)
-                    .background(Color(0xD2121215), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                    .border(1.dp, Color(0x3300FFCC), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-                    .padding(10.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (state.appLanguage == AppLanguage.RU) {
-                                if (telemetryState == "COMPACT") "ТЕЛЕМЕТР." else "ТЕЛЕМЕТРИЯ"
-                            } else if (state.appLanguage == AppLanguage.UK) {
-                                if (telemetryState == "COMPACT") "ТЕЛЕМЕТР." else "ТЕЛЕМЕТРІЯ"
-                            } else {
-                                if (telemetryState == "COMPACT") "TELEMETRY" else "SYSTEM TELEMETRY"
-                            },
-                            fontSize = 11.sp,
-                            color = Color(0xFF00FFCC),
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp,
-                            modifier = Modifier.weight(1f)
-                        )
-                        
-                        // Compact / Expand Button
-                        IconButton(
-                            onClick = {
-                                telemetryState = if (telemetryState == "FULL") "COMPACT" else "FULL"
-                            },
-                            modifier = Modifier.size(20.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (telemetryState == "FULL") Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = if (state.appLanguage == AppLanguage.RU) "Уменьшить" else "Minimize",
-                                tint = Color(0xFF00FFCC),
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                        
-                        Spacer(Modifier.width(2.dp))
-                        
-                        // Hide Button
-                        IconButton(
-                            onClick = { telemetryState = "HIDDEN" },
-                            modifier = Modifier.size(20.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = if (state.appLanguage == AppLanguage.RU) "Скрыть" else "Hide",
-                                tint = Color(0xFFFF5555),
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                    
-                    HorizontalDivider(color = Color(0x22FFFFFF))
-                    
-                    if (telemetryState == "COMPACT") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(text = if (state.appLanguage == AppLanguage.RU) "Вольтаж" else if (state.appLanguage == AppLanguage.UK) "Вольтаж" else "Voltage", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                            Text(text = String.format(Locale.US, "%.1f V", state.telemetry.totalVoltage), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(text = if (state.appLanguage == AppLanguage.RU) "Ток" else if (state.appLanguage == AppLanguage.UK) "Струм" else "Current", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                            Text(text = String.format(Locale.US, "%.0f mA", state.telemetry.totalCurrent), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                    } else {
-                        // FULL view with premium high-tech tab design
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            listOf("ELECTR", "SIM", "PHONE").forEach { tab ->
-                                val isSelected = telemetryTab == tab
-                                val tabIcon = when (tab) {
-                                    "ELECTR" -> "⚡"
-                                    "SIM" -> "⚙️"
-                                    else -> "📱"
-                                }
-                                val tabLabel = when (tab) {
-                                    "ELECTR" -> if (state.appLanguage == AppLanguage.RU) "Схема" else if (state.appLanguage == AppLanguage.UK) "Схема" else "Circuit"
-                                    "SIM" -> if (state.appLanguage == AppLanguage.RU) "Движок" else if (state.appLanguage == AppLanguage.UK) "Двигун" else "Engine"
-                                    else -> if (state.appLanguage == AppLanguage.RU) "Железо" else if (state.appLanguage == AppLanguage.UK) "Залізо" else "Phone"
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .background(
-                                            color = if (isSelected) Color(0x2600FFCC) else Color(0x0AFFFFFF),
-                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
-                                        )
-                                        .border(
-                                            width = 1.dp,
-                                            color = if (isSelected) Color(0xFF00FFCC) else Color(0x11FFFFFF),
-                                            shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
-                                        )
-                                        .clickable { telemetryTab = tab }
-                                        .padding(vertical = 4.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(text = tabIcon, fontSize = 10.sp)
-                                        Text(
-                                            text = tabLabel,
-                                            fontSize = 7.5.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isSelected) Color(0xFF00FFCC) else Color(0xFFAAAAAA)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        HorizontalDivider(color = Color(0x22FFFFFF))
-
-                        when (telemetryTab) {
-                            "ELECTR" -> {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Вольтаж" else if (state.appLanguage == AppLanguage.UK) "Вольтаж" else "Voltage", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    Text(text = String.format(Locale.US, "%.1f V", state.telemetry.totalVoltage), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Ток" else if (state.appLanguage == AppLanguage.UK) "Струм" else "Current", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    Text(text = String.format(Locale.US, "%.0f mA", state.telemetry.totalCurrent), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Мощность" else if (state.appLanguage == AppLanguage.UK) "Потужність" else "Total Power", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    Text(text = String.format(Locale.US, "%.2f W", state.telemetry.totalPower), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Коротк. замык." else if (state.appLanguage == AppLanguage.UK) "Коротк. замик." else "Short Circuit", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    if (state.telemetry.isShortCircuit) {
-                                        Text(text = "YES", fontSize = 10.sp, color = Color(0xFFFF3366), fontWeight = FontWeight.Bold)
-                                    } else {
-                                        Text(text = "NO", fontSize = 10.sp, color = Color(0xFF00FF00), fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                            "SIM" -> {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                                    val activeCpuCores = if (state.isSimulationRunning) (1 + mcuCount) else 1
-                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Ядра процессора" else if (state.appLanguage == AppLanguage.UK) "Ядра процесора" else "CPU Cores", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    Text(text = "$activeCpuCores Cores", fontSize = 10.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                                    val cpuFrequencyMhz = if (state.isSimulationRunning) {
-                                        val baseFreq = 80.0f + (mcuCount * 40.0f)
-                                        val drift = ((System.currentTimeMillis() % 500) - 250) / 1000f
-                                        baseFreq + drift
-                                    } else {
-                                        0.0f
-                                    }
-                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Частота ЦП" else if (state.appLanguage == AppLanguage.UK) "Частота процесора" else "CPU Clock", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    Text(text = if (cpuFrequencyMhz > 0f) String.format(Locale.US, "%.2f MHz", cpuFrequencyMhz) else "0.00 MHz", fontSize = 10.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    val mcuCount = state.grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                                    val ramUsageMb = if (state.isSimulationRunning) {
-                                        val baseRam = 142.4f + (state.width * state.height * 0.05f) + (mcuCount * 12.8f)
-                                        val drift = ((System.currentTimeMillis() % 1000) - 500) / 1500f
-                                        baseRam + drift
-                                    } else {
-                                        12.2f + (state.width * state.height * 0.01f)
-                                    }
-                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Выделено памяти" else if (state.appLanguage == AppLanguage.UK) "Виділено пам'яті" else "RAM Allocated", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    Text(text = String.format(Locale.US, "%.1f MB", ramUsageMb), fontSize = 10.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            "PHONE" -> {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Ядра ЦП телефона" else if (state.appLanguage == AppLanguage.UK) "Ядра ЦП телефону" else "Real CPU Cores", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    Text(text = "$deviceCores Cores", fontSize = 10.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Частота ЦП телефона" else if (state.appLanguage == AppLanguage.UK) "Частота ЦП телефону" else "Real CPU Freq", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    Text(text = "$deviceCurrentFreq / $deviceMaxFreq", fontSize = 10.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(text = if (state.appLanguage == AppLanguage.RU) "ОЗУ игры/Свободно" else if (state.appLanguage == AppLanguage.UK) "ОЗП гри/Вільно" else "Game / Free RAM", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    Text(text = "$appRamUsedByGame / $deviceAvailRam", fontSize = 10.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(text = if (state.appLanguage == AppLanguage.RU) "Всего ОЗУ телефона" else if (state.appLanguage == AppLanguage.UK) "Всього ОЗП телефону" else "Phone Total RAM", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    Text(text = deviceTotalRam, fontSize = 10.sp, color = Color(0xFF00E1FF), fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        UIEngine.TelemetryHUD(
+            lang = state.appLanguage,
+            telemetry = state.telemetry,
+            isSimulationRunning = state.isSimulationRunning,
+            grid = state.grid,
+            deviceCores = deviceCores,
+            deviceMaxFreq = deviceMaxFreq,
+            deviceCurrentFreq = deviceCurrentFreq,
+            deviceTotalRam = deviceTotalRam,
+            deviceAvailRam = deviceAvailRam,
+            appRamUsedByGame = appRamUsedByGame,
+            telemetryTab = telemetryTab,
+            telemetryState = telemetryState,
+            onTabChanged = { telemetryTab = it },
+            onStateChanged = { telemetryState = it },
+            modifier = Modifier.align(Alignment.TopEnd)
+        )
 
         // Bottom Toolbox Overlay
         Box(
@@ -547,7 +236,7 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
                 }
                 .padding(8.dp)
         ) {
-            BottomToolBar(
+            UIEngine.BottomToolBar(
                 lang = state.appLanguage,
                 selectedCategory = state.selectedCategory,
                 selectedTool = state.selectedTool,
@@ -558,7 +247,20 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
 
         if (state.showSaveDialog) SaveDialog(lang = state.appLanguage, onDismiss = { viewModel.dismissDialogs() }, onSave = { name -> viewModel.saveScheme(name) })
         if (state.showLoadDialog) LoadDialog(lang = state.appLanguage, schemes = savedSchemes, onDismiss = { viewModel.dismissDialogs() }, onLoad = { scheme -> viewModel.loadScheme(scheme) }, onDelete = { id -> viewModel.deleteScheme(id) })
-        if (state.showSettingsDialog) SettingsDialog(lang = state.appLanguage, onChangeLang = { viewModel.changeLanguage(it) }, onDismiss = { viewModel.dismissDialogs() }, onResize = { w, h -> viewModel.resizeGrid(w, h) }, exportScheme = { viewModel.getShareableString() }, importScheme = { viewModel.importShareableString(it) })
+        if (state.showSettingsDialog) SettingsDialog(
+            lang = state.appLanguage,
+            onChangeLang = { viewModel.changeLanguage(it) },
+            onDismiss = { viewModel.dismissDialogs() },
+            onResize = { w, h -> viewModel.resizeGrid(w, h) },
+            exportScheme = { viewModel.getShareableString() },
+            importScheme = { viewModel.importShareableString(it) },
+            allocatedRamGb = state.allocatedRamGbytes,
+            allocatedCores = state.allocatedCores,
+            clockMhz = state.clockMhz,
+            canvasStyle = state.canvasStyle,
+            onHardwareUpdate = { ram, cores, mhz, style -> viewModel.updateHardwareSettings(ram, cores, mhz, style) }
+        )
+        if (showWikiDialog) UIEngine.WikiDialog(lang = state.appLanguage, onDismiss = { showWikiDialog = false })
         state.inspectCoordinates?.let { coords ->
             val gridBoundsValid = coords.first in state.grid.indices && coords.second in state.grid[coords.first].indices
             if (gridBoundsValid) {
@@ -712,6 +414,7 @@ fun CircuitGridCanvas(
     height: Int,
     tick: Long,
     selectedTool: ComponentType,
+    canvasStyle: String = "dark_neon",
     onCellClicked: (Int, Int) -> Unit
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
@@ -723,6 +426,9 @@ fun CircuitGridCanvas(
 
     val maxCanvasWidth = width * baseCellSize
     val maxCanvasHeight = height * baseCellSize
+    
+    // Live feedback placement HUD targeting the exact cell under the finger
+    var activeHoverCell by remember { mutableStateOf<Pair<Int, Int>?>(null) }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -746,19 +452,23 @@ fun CircuitGridCanvas(
                             }
                             lastCellX = cellX
                             lastCellY = cellY
+                            activeHoverCell = Pair(cellX, cellY)
                         },
                         onDragEnd = {
                             lastCellX = null
                             lastCellY = null
+                            activeHoverCell = null
                         },
                         onDragCancel = {
                             lastCellX = null
                             lastCellY = null
+                            activeHoverCell = null
                         },
                         onDrag = { change, _ ->
                             val localPoint = (change.position - pan) / scale
                             val cellX = (localPoint.x / baseCellSize).toInt()
                             val cellY = (localPoint.y / baseCellSize).toInt()
+                            activeHoverCell = Pair(cellX, cellY)
                             
                             val previousX = lastCellX
                             val previousY = lastCellY
@@ -832,11 +542,28 @@ fun CircuitGridCanvas(
         }
         
         Canvas(modifier = Modifier.fillMaxSize()) {
+            val forceRedrawOnTick = tick // Force Jetpack Compose to redraw the canvas on every simulation cycle
             withTransform({
                 translate(left = pan.x, top = pan.y)
                 scale(scale, scale, pivot = Offset.Zero)
             }) {
-                drawRect(Color(0xFF1E1E2E), size = Size(maxCanvasWidth, maxCanvasHeight))
+                val bgColor = when (canvasStyle) {
+                    "blueprint" -> Color(0xFF0F172A) // Rich deep engineering blueprint blue
+                    "oled_black" -> Color(0xFF000000) // Pure OLED pitch black
+                    else -> Color(0xFF1E1E2E) // Classic neon slate dark
+                }
+                val gridLineColor = when (canvasStyle) {
+                    "blueprint" -> Color(0x333B82F6) // Brighter blueprint alignment blue
+                    "oled_black" -> Color(0x19444444) // Very subtle slate gray
+                    else -> Color(0x3349454F) // Classic neon border
+                }
+                val outerBoundaryColor = when (canvasStyle) {
+                    "blueprint" -> Color(0xFF38BDF8).copy(alpha = 0.5f) // Electric blueprint blue
+                    "oled_black" -> Color(0xFF555555) // Muted silver boundary
+                    else -> Color(0xFFD0BCFF).copy(alpha = 0.5f) // Classic soft neon purple
+                }
+                
+                drawRect(bgColor, size = Size(maxCanvasWidth, maxCanvasHeight))
                 
                 val visibleStartX = maxOf(0, (-pan.x / (scale * baseCellSize)).toInt() - 1)
                 val visibleEndX = minOf(width, ((size.width - pan.x) / (scale * baseCellSize)).toInt() + 1)
@@ -846,14 +573,51 @@ fun CircuitGridCanvas(
                 // Draw blueprint grid lines
                 for (i in visibleStartX..visibleEndX) {
                     val x = i * baseCellSize
-                    drawLine(Color(0x3349454F), start = Offset(x, 0f), end = Offset(x, maxCanvasHeight), strokeWidth = 2f)
+                    drawLine(gridLineColor, start = Offset(x, 0f), end = Offset(x, maxCanvasHeight), strokeWidth = 2f)
                 }
                 for (j in visibleStartY..visibleEndY) {
                     val y = j * baseCellSize
-                    drawLine(Color(0x3349454F), start = Offset(0f, y), end = Offset(maxCanvasWidth, y), strokeWidth = 2f)
+                    drawLine(gridLineColor, start = Offset(0f, y), end = Offset(maxCanvasWidth, y), strokeWidth = 2f)
                 }
                 
-                drawRect(color = Color(0xFFD0BCFF).copy(alpha = 0.5f), size = Size(maxCanvasWidth, maxCanvasHeight), style = Stroke(width = 4f))
+                drawRect(color = outerBoundaryColor, size = Size(maxCanvasWidth, maxCanvasHeight), style = Stroke(width = 4f))
+
+                // Precision placement crosshair glow ring HUD
+                val cellHover = activeHoverCell
+                if (cellHover != null && cellHover.first in 0 until width && cellHover.second in 0 until height) {
+                    val hX = cellHover.first * baseCellSize
+                    val hY = cellHover.second * baseCellSize
+                    
+                    // Outer glow box
+                    drawRect(
+                        color = Color(0xFF00FFCC),
+                        topLeft = Offset(hX, hY),
+                        size = Size(baseCellSize, baseCellSize),
+                        style = Stroke(width = 3.5f)
+                    )
+                    
+                    // Subtle translucent inside fill highlighting targeted cell
+                    drawRect(
+                        color = Color(0x2200FFCC),
+                        topLeft = Offset(hX, hY),
+                        size = Size(baseCellSize, baseCellSize)
+                    )
+
+                    // Inner precise crosshair lines
+                    val half = baseCellSize / 2f
+                    drawLine(
+                        color = Color(0xFF00FFCC),
+                        start = Offset(hX + half, hY + 10f),
+                        end = Offset(hX + half, hY + baseCellSize - 10f),
+                        strokeWidth = 2f
+                    )
+                    drawLine(
+                        color = Color(0xFF00FFCC),
+                        start = Offset(hX + 10f, hY + half),
+                        end = Offset(hX + baseCellSize - 10f, hY + half),
+                        strokeWidth = 2f
+                    )
+                }
 
                 val actualGridWidth = grid.size
                 val actualGridHeight = if (actualGridWidth > 0) grid[0].size else 0
@@ -885,10 +649,15 @@ fun CircuitGridCanvas(
                                     cat.name == "LOGIC" -> {
                                         if (comp.isPowered) Color(0xFFE040FB) else Color(0xFF7B1FA2)
                                     }
-                                    cat.name == "MATERIALS" -> {
+                                    cat.name == "MATERIALS" || cat.name == "HYDRAULICS" -> {
                                         if (comp.type == ComponentType.WATER || comp.type == ComponentType.INFINITE_WATER) Color(0xFF03A9F4)
                                         else if (comp.type == ComponentType.LAVA || comp.type == ComponentType.INFINITE_LAVA) Color(0xFFF44336)
-                                        else if (comp.type == ComponentType.STEAM) Color(0xAAE0E0E0)
+                                        else if (comp.type == ComponentType.OIL || comp.type == ComponentType.INFINITE_OIL) Color(0xFF212121)
+                                        else if (comp.type == ComponentType.ACID || comp.type == ComponentType.INFINITE_ACID) Color(0xFF8BC34A)
+                                        else if (comp.type == ComponentType.SLIME || comp.type == ComponentType.INFINITE_SLIME) Color(0xFF4CAF50)
+                                        else if (comp.type == ComponentType.GASOLINE || comp.type == ComponentType.INFINITE_GASOLINE) Color(0xFFFFC107)
+                                        else if (comp.type == ComponentType.LIQUID_NITROGEN || comp.type == ComponentType.INFINITE_LIQUID_NITROGEN) Color(0xFF4DD0E1)
+                                        else if (comp.type == ComponentType.STEAM || comp.type == ComponentType.INFINITE_STEAM) Color(0xAAE0E0E0)
                                         else Color(0xFF795548)
                                     }
                                     else -> if (comp.isPowered) Color(0xFF00FFCC) else Color(0xFF49454F)
@@ -1403,7 +1172,14 @@ fun DrawScope.drawComponent(grid: Array<Array<GridComponent>>, x: Int, y: Int, w
                 } else if (component.type == ComponentType.DIAMOND) {
                     drawLine(Color.White, start = Offset(cellSize*0.2f, 0f), end = Offset(cellSize, cellSize*0.8f), strokeWidth = 1.5f)
                 }
-                if (component.type == ComponentType.INFINITE_WATER || component.type == ComponentType.INFINITE_LAVA) {
+                if (component.type == ComponentType.INFINITE_WATER || 
+                    component.type == ComponentType.INFINITE_LAVA ||
+                    component.type == ComponentType.INFINITE_OIL ||
+                    component.type == ComponentType.INFINITE_ACID ||
+                    component.type == ComponentType.INFINITE_SLIME ||
+                    component.type == ComponentType.INFINITE_GASOLINE ||
+                    component.type == ComponentType.INFINITE_LIQUID_NITROGEN ||
+                    component.type == ComponentType.INFINITE_STEAM) {
                     drawRect(Color.White, topLeft = Offset(padding*2, padding*2), size = Size(cellSize - padding*4, cellSize - padding*4))
                 }
                 if (component.type == ComponentType.VOID_HOLE || component.type == ComponentType.FLUID_DRAIN) {
@@ -1453,86 +1229,7 @@ fun DrawScope.drawComponent(grid: Array<Array<GridComponent>>, x: Int, y: Int, w
     }
 } */
 
-@Composable
-fun BottomToolBar(lang: AppLanguage, selectedCategory: ComponentCategory, selectedTool: ComponentType, onCategorySelected: (ComponentCategory) -> Unit, onToolSelected: (ComponentType) -> Unit) {
-    var isCollapsed by remember { mutableStateOf(false) }
-    
-    Column(modifier = Modifier.background(Color.Transparent)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(modifier = Modifier.weight(1f)) {
-                ScrollableTabRow(
-                    selectedTabIndex = ComponentCategory.values().indexOf(selectedCategory),
-                    containerColor = Color.Transparent,
-                    contentColor = Color.White,
-                    indicator = { tabPositions ->
-                        androidx.compose.material3.TabRowDefaults.Indicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[ComponentCategory.values().indexOf(selectedCategory)]),
-                            color = Color(0xFF00FFCC),
-                            height = 3.dp
-                        )
-                    },
-                    divider = {},
-                    edgePadding = 16.dp
-                ) {
-                    ComponentCategory.values().forEachIndexed { index, category ->
-                        Tab(
-                            selected = selectedCategory == category,
-                            onClick = { 
-                                onCategorySelected(category) 
-                                isCollapsed = false
-                            },
-                            text = { 
-                                Text(
-                                    Lang.getCategoryName(category, lang), 
-                                    fontSize = 13.sp, 
-                                    fontWeight = if (selectedCategory == category) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (selectedCategory == category) Color(0xFF00FFCC) else Color(0xFFAAAAAA)
-                                ) 
-                            }
-                        )
-                    }
-                }
-            }
-            
-            IconButton(
-                onClick = { isCollapsed = !isCollapsed },
-                modifier = Modifier.padding(end = 8.dp)
-            ) {
-                Icon(
-                    imageVector = if (isCollapsed) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
-                    contentDescription = "Toggle Menu",
-                    tint = Color(0xFF00FFCC)
-                )
-            }
-        }
-        
-        if (!isCollapsed) {
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            val componentsInCategory = ComponentType.values().filter { it.category == selectedCategory }
-            
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 72.dp),
-                modifier = Modifier.height(195.dp).padding(horizontal = 8.dp),
-                contentPadding = PaddingValues(bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(componentsInCategory) { type ->
-                    ToolButton(
-                        icon = getIconForType(type),
-                        text = Lang.getComponentDisplayName(type, lang),
-                        isSelected = selectedTool == type,
-                        onClick = { onToolSelected(type) }
-                    )
-                }
-            }
-        }
-    }
-}
+
 
 fun getIconForType(type: ComponentType): ImageVector {
     return when(type) {
@@ -1657,6 +1354,5 @@ fun getIconForType(type: ComponentType): ImageVector {
 // Modularized components section
 
 
-// Dialogs 
-// All customized dialogs reside inside com.example.ui.components
+// End of file
 

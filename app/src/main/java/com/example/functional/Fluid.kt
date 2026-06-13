@@ -21,7 +21,12 @@ object Fluid {
                type == ComponentType.ACID ||
                type == ComponentType.SLIME ||
                type == ComponentType.GASOLINE ||
-               type == ComponentType.LIQUID_NITROGEN
+               type == ComponentType.LIQUID_NITROGEN ||
+               type == ComponentType.STEAM ||
+               type == ComponentType.HELIUM ||
+               type == ComponentType.HYDROGEN ||
+               type == ComponentType.METHANE ||
+               type == ComponentType.CARBON_DIOXIDE
     }
 
     /**
@@ -37,7 +42,11 @@ object Fluid {
                type == ComponentType.SLIME ||
                type == ComponentType.LIQUID_NITROGEN ||
                type == ComponentType.STEAM ||
-               type == ComponentType.FIRE
+               type == ComponentType.FIRE ||
+               type == ComponentType.HELIUM ||
+               type == ComponentType.HYDROGEN ||
+               type == ComponentType.METHANE ||
+               type == ComponentType.CARBON_DIOXIDE
     }
 
     /**
@@ -75,6 +84,10 @@ object Fluid {
      */
     fun goesUp(type: ComponentType): Boolean {
         // FIXED: LIQUID_NITROGEN should fall as it is a liquid, not rise like gas. Only steam/fire rise.
-        return type == ComponentType.STEAM || type == ComponentType.FIRE
+        return type == ComponentType.STEAM || 
+               type == ComponentType.FIRE ||
+               type == ComponentType.HELIUM ||
+               type == ComponentType.HYDROGEN ||
+               type == ComponentType.METHANE
     }
 }

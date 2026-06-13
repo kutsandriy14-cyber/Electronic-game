@@ -35,12 +35,21 @@ object PhysicsEngine {
         return !(s1 && s2)
     }
 
-    fun simulateMaterials(grid: Array<Array<GridComponent>>, width: Int, height: Int, voltage: Float) {
+    fun simulateMaterials(grid: Array<Array<GridComponent>>, width: Int, height: Int, voltage: Float, ramGb: Int = 4) {
         val moved = Array(width) { BooleanArray(height) }
         val prevGrid = Array(width) { x -> grid[x].copyOf() }
 
         val dxs4 = intArrayOf(-1, 1, 0, 0)
         val dys4 = intArrayOf(0, 0, -1, 1)
+
+        var particlesSimulated = 0
+        val maxParticles = when {
+            ramGb <= 1 -> 32
+            ramGb <= 2 -> 96
+            ramGb <= 4 -> 256
+            ramGb <= 8 -> 800
+            else -> 99999
+        }
 
         // Movement Phase
         for (y in height - 1 downTo 0) {
@@ -55,6 +64,13 @@ object PhysicsEngine {
                     val comp = prevGrid[x][y]
                     
                     if (isMobileParticle(comp)) {
+                        particlesSimulated++
+                        if (particlesSimulated > maxParticles) {
+                            // Throttled by simulated device memory limit
+                            x += stepX
+                            if (x == endX + stepX) break
+                            continue
+                        }
                         var newX = x
                         var newY = y
                         var didMove = false
@@ -156,15 +172,30 @@ object PhysicsEngine {
                             grid[x][y] = GridComponent(ComponentType.EMPTY)
                             moved[newX][newY] = true
                         }
-                    } else if (comp.type == ComponentType.INFINITE_WATER) {
-                        if (y + 1 in 0 until height && grid[x][y+1].type == ComponentType.EMPTY) {
-                             grid[x][y+1] = GridComponent(ComponentType.WATER)
-                             moved[x][y+1] = true
+                    } else {
+                        val infiniteSpawnType = when (comp.type) {
+                            ComponentType.INFINITE_WATER -> ComponentType.WATER
+                            ComponentType.INFINITE_LAVA -> ComponentType.LAVA
+                            ComponentType.INFINITE_OIL -> ComponentType.OIL
+                            ComponentType.INFINITE_ACID -> ComponentType.ACID
+                            ComponentType.INFINITE_SLIME -> ComponentType.SLIME
+                            ComponentType.INFINITE_GASOLINE -> ComponentType.GASOLINE
+                            ComponentType.INFINITE_LIQUID_NITROGEN -> ComponentType.LIQUID_NITROGEN
+                            ComponentType.INFINITE_STEAM -> ComponentType.STEAM
+                            else -> null
                         }
-                    } else if (comp.type == ComponentType.INFINITE_LAVA) {
-                        if (y + 1 in 0 until height && grid[x][y+1].type == ComponentType.EMPTY) {
-                             grid[x][y+1] = GridComponent(ComponentType.LAVA)
-                             moved[x][y+1] = true
+                        if (infiniteSpawnType != null) {
+                            val spawnDirY = if (Fluid.goesUp(infiniteSpawnType)) -1 else 1
+                            if (y + spawnDirY in 0 until height && grid[x][y + spawnDirY].type == ComponentType.EMPTY) {
+                                val spawnTemp = when (infiniteSpawnType) {
+                                    ComponentType.STEAM -> 150f
+                                    ComponentType.LAVA -> 1200f
+                                    ComponentType.LIQUID_NITROGEN -> -196f
+                                    else -> 20f
+                                }
+                                grid[x][y + spawnDirY] = GridComponent(infiniteSpawnType, temperature = spawnTemp)
+                                moved[x][y + spawnDirY] = true
+                            }
                         }
                     }
                 }
@@ -189,6 +220,9 @@ object PhysicsEngine {
                     }
                     ComponentType.STEAM -> {
                         Steam.simulate(grid, x, y)
+                    }
+                    ComponentType.HELIUM, ComponentType.HYDROGEN, ComponentType.METHANE, ComponentType.CARBON_DIOXIDE -> {
+                        Gas.simulate(grid, x, y, width, height)
                     }
                     ComponentType.LIQUID_NITROGEN -> {
                         LiquidNitrogen.simulate(grid, x, y)

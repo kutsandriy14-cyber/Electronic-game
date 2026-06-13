@@ -10,7 +10,7 @@ enum class ComponentCategory(val title: String) {
     LOGIC("Logic Gates"), 
     ANALOG_ICS("Analog ICs"),
     ADVANCED("Advanced & Memory"),
-    HYDRAULICS("Hydraulics"),
+    HYDRAULICS("Fluids & Gases"),
     MATERIALS("Materials & Solids") 
 }
 
@@ -134,6 +134,10 @@ enum class ComponentType(val category: ComponentCategory) {
     FIRE(ComponentCategory.MATERIALS),
     ICE(ComponentCategory.MATERIALS),
     STEAM(ComponentCategory.HYDRAULICS),
+    HELIUM(ComponentCategory.HYDRAULICS),
+    HYDROGEN(ComponentCategory.HYDRAULICS),
+    METHANE(ComponentCategory.HYDRAULICS),
+    CARBON_DIOXIDE(ComponentCategory.HYDRAULICS),
     SLIME(ComponentCategory.HYDRAULICS),
     RUBBER(ComponentCategory.MATERIALS),
     DIAMOND(ComponentCategory.MATERIALS),
@@ -148,6 +152,12 @@ enum class ComponentType(val category: ComponentCategory) {
     INFINITE_BATTERY(ComponentCategory.POWER),
     INFINITE_WATER(ComponentCategory.HYDRAULICS),
     INFINITE_LAVA(ComponentCategory.HYDRAULICS),
+    INFINITE_OIL(ComponentCategory.HYDRAULICS),
+    INFINITE_ACID(ComponentCategory.HYDRAULICS),
+    INFINITE_SLIME(ComponentCategory.HYDRAULICS),
+    INFINITE_GASOLINE(ComponentCategory.HYDRAULICS),
+    INFINITE_LIQUID_NITROGEN(ComponentCategory.HYDRAULICS),
+    INFINITE_STEAM(ComponentCategory.HYDRAULICS),
     FLUID_DRAIN(ComponentCategory.HYDRAULICS),
     VOID_HOLE(ComponentCategory.HYDRAULICS),
     CONVEYOR_BELT(ComponentCategory.OUTPUTS),

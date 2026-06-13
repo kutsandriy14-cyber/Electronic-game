@@ -74,25 +74,13 @@ fun MultimeterDialog(
                     
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
-                            Text("Voltage Drop", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                            Text(String.format(java.util.Locale.US, "%.2f V", component.voltage), style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Current", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                            Text(if (component.current >= 1000f) String.format(java.util.Locale.US, "%.2f A", component.current / 1000f) else String.format(java.util.Locale.US, "%.1f mA", component.current), style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                            Text("Power Consumption", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            val powerMw = component.voltage * component.current
+                            Text(if (powerMw >= 1000f) String.format(java.util.Locale.US, "%.2f W", powerMw / 1000f) else String.format(java.util.Locale.US, "%.1f mW", powerMw), style = MaterialTheme.typography.bodyMedium, color = Color.White)
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text("Resistance", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                             Text(if (component.resistance >= 1000f) String.format(java.util.Locale.US, "%.1f kΩ", component.resistance / 1000f) else String.format(java.util.Locale.US, "%.1f Ω", component.resistance), style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column {
-                            Text("Power Consumption", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                            val powerMw = component.voltage * component.current
-                            Text(if (powerMw >= 1000f) String.format(java.util.Locale.US, "%.2f W", powerMw / 1000f) else String.format(java.util.Locale.US, "%.1f mW", powerMw), style = MaterialTheme.typography.bodyMedium, color = Color.White)
                         }
                     }
 

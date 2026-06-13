@@ -52,7 +52,14 @@ object FluidEngine {
                         }
 
                         val compType = grid[curr.first][curr.second].type
-                        if (compType == ComponentType.INFINITE_WATER || compType == ComponentType.INFINITE_LAVA) {
+                        if (compType == ComponentType.INFINITE_WATER || 
+                            compType == ComponentType.INFINITE_LAVA ||
+                            compType == ComponentType.INFINITE_OIL ||
+                            compType == ComponentType.INFINITE_ACID ||
+                            compType == ComponentType.INFINITE_SLIME ||
+                            compType == ComponentType.INFINITE_GASOLINE ||
+                            compType == ComponentType.INFINITE_LIQUID_NITROGEN ||
+                            compType == ComponentType.INFINITE_STEAM) {
                             sourceCount++
                         }
 
@@ -134,12 +141,23 @@ object FluidEngine {
                             var pipeLength = 1
                             var isBlocked = true
                             
+                            val visitedPipes = mutableSetOf<Pair<Int, Int>>()
+                            visitedPipes.add(Pair(x, y))
                             while (currOutX in 0 until width && currOutY in 0 until height) {
+                                val outPos = Pair(currOutX, currOutY)
+                                if (visitedPipes.contains(outPos)) {
+                                    break
+                                }
+                                visitedPipes.add(outPos)
+                                
                                 val nextType = grid[currOutX][currOutY].type
                                 if (nextType == ComponentType.PIPE) {
                                     val pipeDir = grid[currOutX][currOutY].direction
                                     val nextOutDx = when(pipeDir) { Direction.RIGHT -> 1; Direction.LEFT -> -1; else -> 0 }
                                     val nextOutDy = when(pipeDir) { Direction.DOWN -> 1; Direction.UP -> -1; else -> 0 }
+                                    if (nextOutDx == 0 && nextOutDy == 0) {
+                                        break
+                                    }
                                     currOutX += nextOutDx
                                     currOutY += nextOutDy
                                     pipeLength++

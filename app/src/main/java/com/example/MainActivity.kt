@@ -16,6 +16,9 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     
+    // Initialize our multi-language asset-based parsing system
+    com.example.lang.Lang.init(applicationContext)
+    
     val database = AppDatabase.getDatabase(this)
     val repository = CircuitRepository(database.schemeDao())
     val viewModelFactory = SimulatorViewModelFactory(repository)

@@ -122,7 +122,7 @@ fun InspectDialog(
                             val maxV = textData.split("|").find { it.startsWith("v=") }?.substring(2)?.toFloatOrNull() ?: 9f
                             maxV * (component.charge / com.example.engine.TabletRender.getMaxCap(component))
                         } else 0f
-                        Text("${Lang.t("live_state", lang)}: ${String.format(java.util.Locale.US, "%.1f", component.charge.coerceAtLeast(0f))} mAh / ${String.format(java.util.Locale.US, "%.2f", currentV)} V", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary)
+                        Text("${Lang.t("live_state", lang)}: ${String.format(java.util.Locale.US, "%.1f", component.charge.coerceAtLeast(0f))} mAh", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary)
                     }
                     if (component.isOverloaded) {
                         Spacer(modifier=Modifier.height(8.dp))
@@ -150,6 +150,49 @@ fun InspectDialog(
                         text = "Pressure: ${String.format(java.util.Locale.US, "%.1f", component.pressure)} kPa",
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (component.pressure > 100f) Color(0xFFFF5722) else Color.White
+                    )
+                }
+                
+                if (component.type == ComponentType.WIND_TURBINE) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val maxV = 6.0f
+                    val efficiency = if (component.isPowered && component.voltage > 0f) {
+                        (component.voltage / maxV).coerceIn(0f, 1f)
+                    } else {
+                        0f
+                    }
+                    val currentWindSpeed = if (efficiency > 0f) {
+                        3.0f + efficiency * 9.0f
+                    } else {
+                        1.5f
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (lang == AppLanguage.RU) 
+                                "Скорость ветра: ${String.format(java.util.Locale.US, "%.1f", currentWindSpeed)} м/с" 
+                                else "Швидкість вітру: ${String.format(java.util.Locale.US, "%.1f", currentWindSpeed)} м/с",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF00FFCC)
+                        )
+                        Text(
+                            text = if (lang == AppLanguage.RU) 
+                                "Эффективность: ${String.format(java.util.Locale.US, "%.0f", efficiency * 100f)}%" 
+                                else "Ефективність: ${String.format(java.util.Locale.US, "%.0f", efficiency * 100f)}%",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF00FFCC)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (lang == AppLanguage.RU)
+                            "Совет: высота расположения ветряка и активные вентиляторы повышают обдув!"
+                            else "Порада: висота розташування вітряка та активні вентилятори збільшують обдув!",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.LightGray
                     )
                 }
                 

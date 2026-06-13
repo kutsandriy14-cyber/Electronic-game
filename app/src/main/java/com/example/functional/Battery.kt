@@ -9,9 +9,9 @@ import com.example.engine.CircuitEngine
  * Definition and helpers for Battery components within the simulator.
  */
 object Battery {
-    const val DEFAULT_BATTERY_CAPACITY = 2500f
-    const val DEFAULT_BATTERY_PACK_CAPACITY = 8000f
-    const val DEFAULT_COIN_CELL_CAPACITY = 220f
+    const val DEFAULT_BATTERY_CAPACITY = 37500f
+    const val DEFAULT_BATTERY_PACK_CAPACITY = 120000f
+    const val DEFAULT_COIN_CELL_CAPACITY = 3300f
 
     /**
      * Checks if a component type is a battery or energy storage.

@@ -111,7 +111,7 @@ class CircuitEngine {
         return logs
     }
 
-    fun calculatePower(inputGrid: Array<Array<GridComponent>>, width: Int, height: Int, tick: Long = 0): SimulationResult {
+    fun calculatePower(inputGrid: Array<Array<GridComponent>>, width: Int, height: Int, tick: Long = 0, ramGb: Int = 4, cores: Int = 4): SimulationResult {
         // Deep copy of GridComponent array.
         val grid = Array(width) { x -> inputGrid[x].map { it.copy() }.toTypedArray() }
         var activeScriptsCount = 0
@@ -314,7 +314,7 @@ class CircuitEngine {
             }
         }
 
-        PhysicsEngine.simulateMaterials(grid, width, height, energyResult.telemetry.totalVoltage)
+        PhysicsEngine.simulateMaterials(grid, width, height, energyResult.telemetry.totalVoltage, ramGb)
 
         return SimulationResult(grid, energyResult.telemetry, logs)
     }

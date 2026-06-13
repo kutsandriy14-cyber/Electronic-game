@@ -131,8 +131,11 @@ object EnergyEngine {
                         }
                     }
                     isActive = hasLight
+                } else if (comp.type == ComponentType.WIND_TURBINE) {
+                    val windSpeed = WindTurbine.getWindSpeedAt(grid, cx, cy, width, height)
+                    isActive = windSpeed >= WindTurbine.getCutInWindSpeed() && windSpeed <= WindTurbine.getCutOutWindSpeed()
                 } else {
-                    isActive = true // AC source, Wind Turbine etc always active when placed
+                    isActive = true // AC source, etc always active when placed
                 }
                 
                 if (isActive) {
@@ -248,6 +251,9 @@ object EnergyEngine {
                             }
                         }
                         isValidSource = hasLight
+                    } else if (comp.type == ComponentType.WIND_TURBINE) {
+                        val windSpeed = WindTurbine.getWindSpeedAt(grid, x, y, width, height)
+                        isValidSource = windSpeed >= WindTurbine.getCutInWindSpeed() && windSpeed <= WindTurbine.getCutOutWindSpeed()
                     } else if (isBatteryType) {
                         val connectedGen = isConnectedToGenerator(grid, x, y, width, height)
                         if (connectedGen == null && currentCharge > 0.05f) {
@@ -262,10 +268,21 @@ object EnergyEngine {
                         totalSources++
                         
                         val maxV = CircuitUtils.propFloat(propsCache[x][y], "v", getDefaultVoltage(comp.type))
-                        val currentV = if (isBatteryType) {
-                            maxV * (currentCharge / maxCap).coerceIn(0f, 1f)
-                        } else {
-                            maxV
+                        var currentV = 0f
+                        if (!comp.isOverloaded) {
+                            val previousCurrentMa = comp.current.coerceAtLeast(0f)
+                            val maxI = getRatedMaxCurrentMa(comp.type)
+                            val sagFactor = if (maxI > 0) (previousCurrentMa / maxI).coerceIn(0f, 1.2f) else 0f
+                            val baseV = if (isBatteryType) {
+                                maxV * (currentCharge / maxCap).coerceIn(0f, 1f)
+                            } else if (comp.type == ComponentType.WIND_TURBINE) {
+                                val windSpeed = WindTurbine.getWindSpeedAt(grid, x, y, width, height)
+                                maxV * WindTurbine.getEfficiency(windSpeed)
+                            } else {
+                                maxV
+                            }
+                            val sagReduction = if (isBatteryType) 0.25f else 0.45f
+                            currentV = baseV * (1f - sagReduction * sagFactor)
                         }
                         
                         if (currentV > 0.1f && comp.type != ComponentType.NUCLEAR_REACTOR) {
@@ -330,20 +347,30 @@ object EnergyEngine {
                     var sourceV = 0f
                     if (src != null) {
                         val sComp = grid[src.first][src.second]
-                        val sMaxV = CircuitUtils.propFloat(propsCache[src.first][src.second], "v", getDefaultVoltage(sComp.type))
-                        val sMaxCharge = RenderEngine.getMaxCap(sComp)
-                        val sIsBatteryType = Battery.isBattery(sComp.type)
-                        val sCharge = if (sIsBatteryType) {
-                            if (sComp.charge < 0f || sComp.charge.isNaN()) sMaxCharge else sComp.charge
-                        } else {
-                            sMaxCharge
+                        if (!sComp.isOverloaded) {
+                            val sMaxV = CircuitUtils.propFloat(propsCache[src.first][src.second], "v", getDefaultVoltage(sComp.type))
+                            val sMaxCharge = RenderEngine.getMaxCap(sComp)
+                            val sIsBatteryType = Battery.isBattery(sComp.type)
+                            val sCharge = if (sIsBatteryType) {
+                                if (sComp.charge < 0f || sComp.charge.isNaN()) sMaxCharge else sComp.charge
+                            } else {
+                                sMaxCharge
+                            }
+                            val previousCurrentMa = sComp.current.coerceAtLeast(0f)
+                            val maxI = getRatedMaxCurrentMa(sComp.type)
+                            val sagFactor = if (maxI > 0) (previousCurrentMa / maxI).coerceIn(0f, 1.2f) else 0f
+                            val baseSourceV = if (sIsBatteryType) {
+                                sMaxV * (sCharge / sMaxCharge).coerceIn(0f, 1f)
+                            } else if (sComp.type == ComponentType.WIND_TURBINE) {
+                                val windSpeed = WindTurbine.getWindSpeedAt(grid, src.first, src.second, width, height)
+                                sMaxV * WindTurbine.getEfficiency(windSpeed)
+                            } else {
+                                sMaxV
+                            }
+                            val sagReduction = if (sIsBatteryType) 0.25f else 0.45f
+                            sourceV = baseSourceV * (1f - sagReduction * sagFactor)
+                            sourceV *= voltageMultiplier[x][y]
                         }
-                        sourceV = if (sIsBatteryType) {
-                            sMaxV * (sCharge / sMaxCharge).coerceIn(0f, 1f)
-                        } else {
-                            sMaxV
-                        }
-                        sourceV *= voltageMultiplier[x][y]
                     }
 
                     val rTotal = minResistance[x][y] + 0.1f 
@@ -414,59 +441,89 @@ object EnergyEngine {
         for (x in 0 until width) {
             for (y in 0 until height) {
                 val comp = grid[x][y]
-                if (comp.type == ComponentType.BATTERY || comp.type == ComponentType.BATTERY_PACK || comp.type == ComponentType.COIN_CELL) {
-                    val maxCap = RenderEngine.getMaxCap(comp)
-                    val maxV = CircuitUtils.propFloat(propsCache[x][y], "v", getDefaultVoltage(comp.type))
-                    val currentCharge = if (comp.charge < 0f || comp.charge.isNaN()) maxCap else comp.charge
+                val type = comp.type
+                
+                if (isPowerSource(type)) {
+                    var totalDischargeCurrentMa = 0f
+                    for (lx in 0 until width) {
+                        for (ly in 0 until height) {
+                            val cLoad = grid[lx][ly]
+                            if (primarySource[lx][ly] == Pair(x, y) && isLoad(cLoad.type)) {
+                                totalDischargeCurrentMa += cLoad.current
+                            }
+                        }
+                    }
                     
-                    val connectedGen = isConnectedToGenerator(grid, x, y, width, height)
-                    if (connectedGen != null) {
-                        val vReceiving = if (minResistance[x][y] < Float.MAX_VALUE) grid[x][y].voltage else 0f
-                        val batteryCurrentV = maxV * (currentCharge / maxCap).coerceIn(0.1f, 1f)
+                    val maxI = getRatedMaxCurrentMa(type)
+                    var isOverloadedNow = comp.isOverloaded
+                    if (totalDischargeCurrentMa > maxI * 1.5f && type != ComponentType.INFINITE_BATTERY) {
+                        isOverloadedNow = true
+                    }
+                    
+                    if (Battery.isBattery(type)) {
+                        val maxCap = RenderEngine.getMaxCap(comp)
+                        val maxV = CircuitUtils.propFloat(propsCache[x][y], "v", getDefaultVoltage(type))
+                        val currentCharge = if (comp.charge < 0f || comp.charge.isNaN()) maxCap else comp.charge
                         
-                        if (vReceiving > batteryCurrentV && currentCharge < maxCap) {
-                            val internalRes = resistanceCache[x][y].coerceAtLeast(0.1f)
-                            val chargeCurrentMa = (((vReceiving - batteryCurrentV) / internalRes) * 1000f).coerceIn(100f, when(comp.type) {
-                                ComponentType.COIN_CELL -> 200f
-                                ComponentType.BATTERY -> 1500f
-                                else -> 4000f // BATTERY_PACK
-                            })
-                            val chargeGainTick = (chargeCurrentMa / 72000f) * timeScale * 0.85f // 85% charging efficiency
-                            val newCharge = (currentCharge + chargeGainTick).coerceAtMost(maxCap)
+                        val connectedGen = isConnectedToGenerator(grid, x, y, width, height)
+                        if (connectedGen != null && !isOverloadedNow) {
+                            val vReceiving = if (minResistance[x][y] < Float.MAX_VALUE) grid[x][y].voltage else 0f
+                            val batteryCurrentV = maxV * (currentCharge / maxCap).coerceIn(0.1f, 1f)
+                            
+                            val isOverPotential = vReceiving > batteryCurrentV
+                            if ((isOverPotential || vReceiving > 0.5f) && currentCharge < maxCap) {
+                                val activeChargingV = maxOf(vReceiving, batteryCurrentV + 1.2f)
+                                val internalRes = resistanceCache[x][y].coerceAtLeast(0.1f)
+                                val chargeCurrentMa = (((activeChargingV - batteryCurrentV) / internalRes) * 1000f).coerceIn(200f, when(type) {
+                                    ComponentType.COIN_CELL -> 500f
+                                    ComponentType.BATTERY -> 3000f
+                                    else -> 8000f
+                                })
+                                val chargeGainTick = (chargeCurrentMa / 72000f) * timeScale * 1.5f
+                                val newCharge = (currentCharge + chargeGainTick).coerceAtMost(maxCap)
+                                
+                                grid[x][y] = comp.copy(
+                                    charge = newCharge,
+                                    isPowered = true,
+                                    voltage = vReceiving,
+                                    current = -chargeCurrentMa,
+                                    isOverloaded = isOverloadedNow
+                                )
+                            } else {
+                                grid[x][y] = comp.copy(
+                                    charge = currentCharge,
+                                    isPowered = true,
+                                    voltage = vReceiving,
+                                    current = 0f,
+                                    isOverloaded = isOverloadedNow
+                                )
+                            }
+                        } else {
+                            val batteryV = if (isOverloadedNow) 0f else (maxV * (currentCharge / maxCap).coerceIn(0f, 1f))
+                            val sagFactor = if (maxI > 0) (totalDischargeCurrentMa / maxI).coerceIn(0f, 1f) else 0f
+                            val actualBatteryV = batteryV * (1f - 0.25f * sagFactor)
+                            
+                            val chargeLossTick = (totalDischargeCurrentMa / 288000f) * timeScale
+                            val newCharge = (currentCharge - chargeLossTick).coerceAtLeast(0f)
                             
                             grid[x][y] = comp.copy(
                                 charge = newCharge,
-                                isPowered = true,
-                                voltage = vReceiving,
-                                current = -chargeCurrentMa // Negative current represents input charging!
-                            )
-                        } else {
-                            grid[x][y] = comp.copy(
-                                charge = currentCharge,
-                                isPowered = true,
-                                voltage = vReceiving,
-                                current = 0f
-                            )
+                                isPowered = newCharge > 0.05f && !isOverloadedNow,
+                                voltage = if (newCharge > 0.05f) actualBatteryV else 0f,
+                                current = if (newCharge > 0.05f) totalDischargeCurrentMa else 0f,
+                                isOverloaded = isOverloadedNow
+                              )
                         }
                     } else {
-                        var totalBatteryDischargeCurrentMa = 0f
-                        for (lx in 0 until width) {
-                            for (ly in 0 until height) {
-                                val cLoad = grid[lx][ly]
-                                if (primarySource[lx][ly] == Pair(x, y) && isLoad(cLoad.type)) {
-                                    totalBatteryDischargeCurrentMa += cLoad.current
-                                }
-                            }
-                        }
-                        
-                        val chargeLossTick = (totalBatteryDischargeCurrentMa / 72000f) * timeScale
-                        val newCharge = (currentCharge - chargeLossTick).coerceAtLeast(0f)
+                        val sMaxV = CircuitUtils.propFloat(propsCache[x][y], "v", getDefaultVoltage(type))
+                        val sagFactor = if (maxI > 0) (totalDischargeCurrentMa / maxI).coerceIn(0f, 1.2f) else 0f
+                        val actualGenV = if (isOverloadedNow) 0f else sMaxV * (1f - 0.45f * sagFactor)
                         
                         grid[x][y] = comp.copy(
-                            charge = newCharge,
-                            isPowered = newCharge > 0.05f,
-                            voltage = if (newCharge > 0.05f) maxV * (newCharge / maxCap).coerceIn(0f, 1f) else 0f,
-                            current = if (newCharge > 0.05f) totalBatteryDischargeCurrentMa else 0f
+                            isPowered = actualGenV > 0.1f,
+                            voltage = actualGenV,
+                            current = totalDischargeCurrentMa,
+                            isOverloaded = isOverloadedNow
                         )
                     }
                 }
@@ -573,6 +630,21 @@ object EnergyEngine {
             Microcontroller.isMicrocontrollerOrMemory(type) -> 5000f
             
             else -> 0.5f
+        }
+    }
+
+    fun getRatedMaxCurrentMa(type: ComponentType): Float {
+        return when (type) {
+            ComponentType.NUCLEAR_REACTOR -> 35000f
+            ComponentType.GENERATOR -> 15000f
+            ComponentType.GEOTHERMAL_GENERATOR -> 10000f
+            ComponentType.HYDRO_GENERATOR -> 6000f
+            ComponentType.WIND_TURBINE -> 4000f
+            ComponentType.SOLAR_PANEL -> 2500f
+            ComponentType.COIN_CELL -> 600f
+            ComponentType.BATTERY -> 4000f
+            ComponentType.BATTERY_PACK -> 12000f
+            else -> 100000f
         }
     }
 

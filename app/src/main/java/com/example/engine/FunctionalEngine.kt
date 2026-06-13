@@ -32,6 +32,10 @@ object FunctionalEngine {
     fun isMobileParticle(type: ComponentType): Boolean {
         return Fluid.isFluid(type) ||
                type == ComponentType.STEAM ||
+               type == ComponentType.HELIUM ||
+               type == ComponentType.HYDROGEN ||
+               type == ComponentType.METHANE ||
+               type == ComponentType.CARBON_DIOXIDE ||
                type == ComponentType.FIRE ||
                type == ComponentType.SAND ||
                type == ComponentType.DIRT ||
