@@ -32,49 +32,28 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-      - name: Auto-Bump Version
+      - name: Auto-Bump Version to 1.4.25
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         id: version_bump
         run: |
+          git fetch origin ${{ github.ref_name }}
           git checkout ${{ github.ref_name }}
-          python3 -c '
-          import re
-          file_path = "app/build.gradle.kts"
-          with open(file_path, "r", encoding="utf-8") as f:
-              content = f.read()
-
-          # Match versionCode
-          code_match = re.search(r"versionCode\s*=\s*(\d+)", content)
-          if code_match:
-              old_code = int(code_match.group(1))
-              new_code = old_code + 1
-              content = re.sub(r"(versionCode\s*=\s*)\d+", f"\\g<1>{new_code}", content)
-
-          # Match versionName
-          name_match = re.search(r"versionName\s*=\s*\"([^\"]+)\"", content)
-          if name_match:
-              old_name = name_match.group(1)
-              parts = old_name.split(".")
-              if len(parts) >= 3:
-                  parts[-1] = str(int(parts[-1]) + 1)
-                  new_name = ".".join(parts)
-              else:
-                  new_name = old_name + ".1"
-              content = re.sub(r"(versionName\s*=\s*)\"[^\"]+\"", f"\\g<1>\"{new_name}\"", content)
-
-          with open(file_path, "w", encoding="utf-8") as f:
-              f.write(content)
-          '
-          # Extract version to temporary var
+          git pull origin ${{ github.ref_name }} --rebase || true
+          
+          # Update version to 1.4.25
+          sed -i 's/versionCode = 10424/versionCode = 10425/g' app/build.gradle.kts
+          sed -i 's/versionName = "1.4.24"/versionName = "1.4.25"/g' app/build.gradle.kts
+          
+          # Extract version
           VERSION_NAME=$(grep "versionName =" app/build.gradle.kts | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
           
-          # Commit and Push changes back to repo
+          # Commit and Push changes
           git add app/build.gradle.kts
-          git commit -m "chore(release): bump version to v$VERSION_NAME [skip ci]"
-          git push origin ${{ github.ref_name }}
+          git commit -m "chore(release): bump version to v$VERSION_NAME [skip ci]" || true
+          git push origin ${{ github.ref_name }} || true
 
-      - name: Extract Version Name (Fall-back or Non-push)
+      - name: Extract Version Name (Fall-back)
         if: env.VERSION_NAME == ''
         run: |
           VERSION_NAME=$(grep "versionName =" app/build.gradle.kts | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
@@ -83,7 +62,7 @@ jobs:
       - name: Set KSP Compilation Strategy to Daemon
         run: |
           if [ -f "gradle.properties" ]; then
-            sed -i 's/kotlin.compiler.execution.strategy=in-process/kotlin.compiler.execution.strategy=daemon/g' gradle.properties
+            sed -i 's/kotlin.compiler.execution.strategy=in-process/kotlin.compiler.execution.strategy=daemon/g' gradle.properties || true
           fi
 
       - name: Grant execute permission for gradlew
@@ -92,11 +71,21 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
 
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --stacktrace
+
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+
+      - name: Upload Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: warn
 
       - name: Create Git Tag and GitHub Release
@@ -108,14 +97,9 @@ jobs:
           body: |
             ### 🤖 Автоматический релиз / Automatic Release v${{ env.VERSION_NAME }}
             
-            Этот релиз был создан автоматически при отправке изменений в ветку.
+            Этот релиз был создан автоматически при отправке изменений в ветку main.
             
             #### 📝 Список изменений (Changelog):
-            - Автоматический инкремент версии приложения (versionCode & versionName) и фиксация изменений в репозитории.
-            - Исправлена проблема сборщика KSP в CI-окружении (NullPointerException) путем переключения на daemon компиляцию на время сборки.
-          draft: false
-          prerelease: false
-          files: |
-            app/build/outputs/apk/debug/app-debug.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - Версия приложения обновлена до v${{ env.VERSION_NAME }}
+            - Авт](#)
+
