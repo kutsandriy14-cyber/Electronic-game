@@ -1,24 +1,22 @@
-name: Android CI Build & Auto-Release
+name: Android APK Build
 
 on:
   push:
     branches: [ main, master, dev ]
   pull_request:
     branches: [ main, master, dev ]
-
-permissions:
-  contents: write
+  workflow_dispatch: # Позволяет запускать workflow вручную
 
 jobs:
   build:
-    name: Build, Bump and Release
+    name: Build APK
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -26,44 +24,6 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
           cache: 'gradle'
-
-      - name: Configure Git User
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-
-      - name: Auto-Bump Version to 1.4.25
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-        id: version_bump
-        run: |
-          git fetch origin ${{ github.ref_name }}
-          git checkout ${{ github.ref_name }}
-          git pull origin ${{ github.ref_name }} --rebase || true
-          
-          # Update version to 1.4.25
-          sed -i 's/versionCode = 10424/versionCode = 10425/g' app/build.gradle.kts
-          sed -i 's/versionName = "1.4.24"/versionName = "1.4.25"/g' app/build.gradle.kts
-          
-          # Extract version
-          VERSION_NAME=$(grep "versionName =" app/build.gradle.kts | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
-          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
-          
-          # Commit and Push changes
-          git add app/build.gradle.kts
-          git commit -m "chore(release): bump version to v$VERSION_NAME [skip ci]" || true
-          git push origin ${{ github.ref_name }} || true
-
-      - name: Extract Version Name (Fall-back)
-        if: env.VERSION_NAME == ''
-        run: |
-          VERSION_NAME=$(grep "versionName =" app/build.gradle.kts | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
-          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
-
-      - name: Set KSP Compilation Strategy to Daemon
-        run: |
-          if [ -f "gradle.properties" ]; then
-            sed -i 's/kotlin.compiler.execution.strategy=in-process/kotlin.compiler.execution.strategy=daemon/g' gradle.properties || true
-          fi
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -87,19 +47,3 @@ jobs:
           name: release-apk
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: warn
-
-      - name: Create Git Tag and GitHub Release
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ env.VERSION_NAME }}"
-          name: "Release v${{ env.VERSION_NAME }}"
-          body: |
-            ### 🤖 Автоматический релиз / Automatic Release v${{ env.VERSION_NAME }}
-            
-            Этот релиз был создан автоматически при отправке изменений в ветку main.
-            
-            #### 📝 Список изменений (Changelog):
-            - Версия приложения обновлена до v${{ env.VERSION_NAME }}
-            - Авт](#)
-
