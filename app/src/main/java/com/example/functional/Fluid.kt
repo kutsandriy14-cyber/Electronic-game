@@ -26,7 +26,9 @@ object Fluid {
                type == ComponentType.HELIUM ||
                type == ComponentType.HYDROGEN ||
                type == ComponentType.METHANE ||
-               type == ComponentType.CARBON_DIOXIDE
+               type == ComponentType.CARBON_DIOXIDE ||
+               type == ComponentType.PLASMA ||
+               type == ComponentType.MERCURY
     }
 
     /**
@@ -46,7 +48,9 @@ object Fluid {
                type == ComponentType.HELIUM ||
                type == ComponentType.HYDROGEN ||
                type == ComponentType.METHANE ||
-               type == ComponentType.CARBON_DIOXIDE
+               type == ComponentType.CARBON_DIOXIDE ||
+               type == ComponentType.PLASMA ||
+               type == ComponentType.MERCURY
     }
 
     /**
@@ -88,6 +92,7 @@ object Fluid {
                type == ComponentType.FIRE ||
                type == ComponentType.HELIUM ||
                type == ComponentType.HYDROGEN ||
-               type == ComponentType.METHANE
+               type == ComponentType.METHANE ||
+               type == ComponentType.PLASMA
     }
 }

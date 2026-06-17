@@ -39,6 +39,9 @@ object PhysicsEngine {
         val moved = Array(width) { BooleanArray(height) }
         val prevGrid = Array(width) { x -> grid[x].copyOf() }
 
+        // Recalculate fluid network pressures, flow direction pipe leaks, and pressure sensors
+        FluidEngine.calculatePressureAndLeaks(grid, width, height, moved)
+
         val dxs4 = intArrayOf(-1, 1, 0, 0)
         val dys4 = intArrayOf(0, 0, -1, 1)
 
@@ -182,6 +185,7 @@ object PhysicsEngine {
                             ComponentType.INFINITE_GASOLINE -> ComponentType.GASOLINE
                             ComponentType.INFINITE_LIQUID_NITROGEN -> ComponentType.LIQUID_NITROGEN
                             ComponentType.INFINITE_STEAM -> ComponentType.STEAM
+                            ComponentType.INFINITE_PLASMA -> ComponentType.PLASMA
                             else -> null
                         }
                         if (infiniteSpawnType != null) {
@@ -191,6 +195,7 @@ object PhysicsEngine {
                                     ComponentType.STEAM -> 150f
                                     ComponentType.LAVA -> 1200f
                                     ComponentType.LIQUID_NITROGEN -> -196f
+                                    ComponentType.PLASMA -> 3000f
                                     else -> 20f
                                 }
                                 grid[x][y + spawnDirY] = GridComponent(infiniteSpawnType, temperature = spawnTemp)
@@ -212,6 +217,45 @@ object PhysicsEngine {
                 if (comp.type == ComponentType.EMPTY) continue
 
                 when(comp.type) {
+                    ComponentType.PLASMA -> {
+                        Plasma.interactWithSurroundings(grid, x, y, width, height)
+                    }
+                    ComponentType.BLACK_HOLE -> {
+                        BlackHole.applyGravity(grid, x, y, width, height)
+                    }
+                    ComponentType.PORTAL_IN -> {
+                        PortalIn.handleTeleportation(grid, x, y, width, height)
+                    }
+                    ComponentType.PORTAL_OUT -> {
+                        // Handled by PortalIn
+                    }
+                    ComponentType.TESLA_COIL -> {
+                        TeslaCoil.transmitWirelessPower(grid, x, y, width, height)
+                    }
+                    ComponentType.MERCURY -> {
+                        Mercury.simulate(grid, x, y, width, height, moved)
+                    }
+                    ComponentType.LIGHTNING_ROD -> {
+                        LightningRod.simulate(grid, x, y, comp, width, height)
+                    }
+                    ComponentType.STIRLING_ENGINE -> {
+                        grid[x][y] = StirlingEngine.simulate(grid, x, y, comp, width, height)
+                    }
+                    ComponentType.QUANTUM_SUPERCONDUCTOR -> {
+                        QuantumSuperconductor.conduct(grid, x, y, comp, width, height)
+                    }
+                    ComponentType.PCM_CELL -> {
+                        grid[x][y] = PcmCell.bufferTemperature(grid, x, y, comp, width, height)
+                    }
+                    ComponentType.LASER_RECEIVER -> {
+                        grid[x][y] = LaserReceiver.processLaserDetection(grid, x, y, comp, width, height)
+                    }
+                    ComponentType.GRAPHITE_ROD -> {
+                        grid[x][y] = GraphiteRod.dampenNuclearHeat(grid, x, y, comp, width, height)
+                    }
+                    ComponentType.PIEZO_SENSOR -> {
+                        grid[x][y] = PiezoSensor.processPressure(grid, x, y, comp, width, height)
+                    }
                     ComponentType.WATER, ComponentType.INFINITE_WATER -> {
                         Water.interact(grid, x, y, width, height)
                     }

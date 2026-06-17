@@ -1082,40 +1082,166 @@ object RenderEngine {
                         }
                         drawRect(matColor, size = Size(cellSize, cellSize))
                         
-                        if (component.type == ComponentType.BRICK) {
-                            drawLine(Color(0xFFB71C1C), start = Offset(0f, cellSize*0.33f), end = Offset(cellSize, cellSize*0.33f), strokeWidth = 2f)
-                            drawLine(Color(0xFFB71C1C), start = Offset(0f, cellSize*0.66f), end = Offset(cellSize, cellSize*0.66f), strokeWidth = 2f)
-                        } else if (component.type in listOf(ComponentType.STEEL, ComponentType.COPPER, ComponentType.ALUMINUM, ComponentType.GOLD)) {
-                            val shine = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color.Transparent, Color(0x44FFFFFF), Color.Transparent))
-                            drawRect(shine, size = Size(cellSize, cellSize))
-                        } else if (component.type == ComponentType.DIAMOND) {
-                            drawLine(Color.White, start = Offset(cellSize*0.2f, 0f), end = Offset(cellSize, cellSize*0.8f), strokeWidth = 1.5f)
-                        } else if (component.type == ComponentType.PIPE) {
-                            val arrowColor = Color(0xFF00E676)
-                            drawRect(Color(0xFF263238), topLeft = Offset(cellSize*0.2f, cellSize*0.2f), size = Size(cellSize*0.6f, cellSize*0.6f))
-                            when (component.direction) {
-                                Direction.RIGHT -> {
-                                    drawLine(arrowColor, start = Offset(cellSize*0.2f, cy), end = Offset(cellSize*0.8f, cy), strokeWidth = 4f)
-                                    drawLine(arrowColor, start = Offset(cellSize*0.8f, cy), end = Offset(cellSize*0.5f, cy - cellSize*0.2f), strokeWidth = 4f)
-                                    drawLine(arrowColor, start = Offset(cellSize*0.8f, cy), end = Offset(cellSize*0.5f, cy + cellSize*0.2f), strokeWidth = 4f)
+                        // Render customized textures with fine details per component type
+                        when (component.type) {
+                            ComponentType.SAND -> {
+                                drawCircle(Color(0xFFE5A900), radius = cellSize * 0.04f, center = Offset(cellSize * 0.25f, cellSize * 0.3f))
+                                drawCircle(Color(0xFFFFD54F), radius = cellSize * 0.03f, center = Offset(cellSize * 0.75f, cellSize * 0.45f))
+                                drawCircle(Color(0xFFD48F00), radius = cellSize * 0.04f, center = Offset(cellSize * 0.45f, cellSize * 0.8f))
+                            }
+                            ComponentType.DIRT -> {
+                                drawRect(Color(0xFF5D4037), topLeft = Offset(cellSize * 0.15f, cellSize * 0.25f), size = Size(cellSize * 0.15f, cellSize * 0.10f))
+                                drawRect(Color(0xFF5D4037), topLeft = Offset(cellSize * 0.6f, cellSize * 0.7f), size = Size(cellSize * 0.2f, cellSize * 0.15f))
+                                drawCircle(Color(0xFF43281C), radius = cellSize * 0.05f, center = Offset(cellSize * 0.4f, cellSize * 0.5f))
+                            }
+                            ComponentType.STONE -> {
+                                drawLine(Color(0xFF555555), start = Offset(0f, cellSize * 0.2f), end = Offset(cellSize * 0.4f, cellSize * 0.4f), strokeWidth = 2f)
+                                drawLine(Color(0xFF555555), start = Offset(cellSize * 0.4f, cellSize * 0.4f), end = Offset(cellSize * 0.3f, cellSize * 0.8f), strokeWidth = 2f)
+                                drawLine(Color(0xFF555555), start = Offset(cellSize * 0.4f, cellSize * 0.4f), end = Offset(cellSize * 0.8f, cellSize * 0.3f), strokeWidth = 2f)
+                            }
+                            ComponentType.GLASS -> {
+                                drawLine(Color(0x66FFFFFF), start = Offset(cellSize * 0.2f, 0f), end = Offset(cellSize, cellSize * 0.8f), strokeWidth = cellSize * 0.08f)
+                                drawLine(Color(0xAAFFFFFF), start = Offset(0f, cellSize * 0.4f), end = Offset(cellSize * 0.6f, cellSize), strokeWidth = 1.5f)
+                            }
+                            ComponentType.WOOD -> {
+                                drawArc(Color(0xFF5D4037), startAngle = 0f, sweepAngle = 180f, useCenter = false, topLeft = Offset(-cellSize * 0.2f, -cellSize * 0.2f), size = Size(cellSize * 1.4f, cellSize * 1.4f), style = Stroke(1.8f))
+                                drawArc(Color(0xFF5D4037), startAngle = 0f, sweepAngle = 180f, useCenter = false, topLeft = Offset(-cellSize * 0.5f, -cellSize * 0.5f), size = Size(cellSize * 2.0f, cellSize * 2.0f), style = Stroke(1.8f))
+                                drawLine(Color(0xFF5D4037), start = Offset(cellSize * 0.8f, 0f), end = Offset(cellSize * 0.9f, cellSize), strokeWidth = 1.2f)
+                            }
+                            ComponentType.ICE -> {
+                                drawLine(Color(0xFFE0F7FA), start = Offset(0f, 0f), end = Offset(cellSize, cellSize), strokeWidth = 1.8f)
+                                drawLine(Color(0xFFE0F7FA), start = Offset(cellSize, 0f), end = Offset(0f, cellSize), strokeWidth = 1.2f)
+                            }
+                            ComponentType.COAL -> {
+                                val coalPath = Path().apply {
+                                    moveTo(cellSize * 0.1f, cellSize * 0.5f)
+                                    lineTo(cellSize * 0.5f, cellSize * 0.1f)
+                                    lineTo(cellSize * 0.9f, cellSize * 0.4f)
+                                    lineTo(cellSize * 0.8f, cellSize * 0.8f)
+                                    lineTo(cellSize * 0.2f, cellSize * 0.8f)
+                                    close()
                                 }
-                                Direction.LEFT -> {
-                                    drawLine(arrowColor, start = Offset(cellSize*0.8f, cy), end = Offset(cellSize*0.2f, cy), strokeWidth = 4f)
-                                    drawLine(arrowColor, start = Offset(cellSize*0.2f, cy), end = Offset(cellSize*0.5f, cy - cellSize*0.2f), strokeWidth = 4f)
-                                    drawLine(arrowColor, start = Offset(cellSize*0.2f, cy), end = Offset(cellSize*0.5f, cy + cellSize*0.2f), strokeWidth = 4f)
+                                drawPath(coalPath, Color(0xFF212121), style = Stroke(1.8f))
+                                drawLine(Color(0xFF212121), start = Offset(cellSize * 0.5f, cellSize * 0.1f), end = Offset(cellSize * 0.5f, cellSize * 0.8f), strokeWidth = 1.2f)
+                            }
+                            ComponentType.SPONGE -> {
+                                drawCircle(Color(0xFFFBC02D), radius = cellSize * 0.06f, center = Offset(cellSize * 0.3f, cellSize * 0.3f))
+                                drawCircle(Color(0xFFFBC02D), radius = cellSize * 0.08f, center = Offset(cellSize * 0.7f, cellSize * 0.35f))
+                                drawCircle(Color(0xFFFBC02D), radius = cellSize * 0.05f, center = Offset(cellSize * 0.4f, cellSize * 0.75f))
+                                drawCircle(Color(0xFFFBC02D), radius = cellSize * 0.07f, center = Offset(cellSize * 0.8f, cellSize * 0.75f))
+                            }
+                            ComponentType.SLIME, ComponentType.INFINITE_SLIME -> {
+                                drawCircle(Color(0x88FFFFFF), radius = cellSize * 0.08f, center = Offset(cellSize * 0.3f, cellSize * 0.4f))
+                                drawCircle(Color(0x88FFFFFF), radius = cellSize * 0.05f, center = Offset(cellSize * 0.65f, cellSize * 0.65f))
+                            }
+                            ComponentType.MAGIC_DUST -> {
+                                val scaleStar = 0.5f + 0.5f * kotlin.math.sin((System.currentTimeMillis() % 2000) / 2000f * 2.0 * Math.PI).toFloat()
+                                drawLine(Color.White, start = Offset(cellSize * 0.3f - cellSize * 0.1f * scaleStar, cellSize * 0.3f), end = Offset(cellSize * 0.3f + cellSize * 0.1f * scaleStar, cellSize * 0.3f), strokeWidth = 2f)
+                                drawLine(Color.White, start = Offset(cellSize * 0.3f, cellSize * 0.3f - cellSize * 0.1f * scaleStar), end = Offset(cellSize * 0.3f, cellSize * 0.3f + cellSize * 0.1f * scaleStar), strokeWidth = 2f)
+                                drawLine(Color.White, start = Offset(cellSize * 0.7f - cellSize * 0.08f, cellSize * 0.7f), end = Offset(cellSize * 0.7f + cellSize * 0.08f, cellSize * 0.7f), strokeWidth = 1.5f)
+                                drawLine(Color.White, start = Offset(cellSize * 0.7f, cellSize * 0.7f - cellSize * 0.08f), end = Offset(cellSize * 0.7f, cellSize * 0.7f + cellSize * 0.08f), strokeWidth = 1.5f)
+                            }
+                            ComponentType.URANIUM -> {
+                                val scaleU = 0.8f + 0.2f * kotlin.math.sin((System.currentTimeMillis() % 1500) / 1500f * 2.0 * Math.PI).toFloat()
+                                drawCircle(Color(0xCC00FF00), radius = cellSize * 0.16f * scaleU, center = Offset(cellSize * 0.5f, cellSize * 0.5f))
+                                drawCircle(Color.Black.copy(alpha = 0.35f), radius = cellSize * 0.26f, center = Offset(cellSize * 0.5f, cellSize * 0.5f), style = Stroke(1.5f))
+                            }
+                            ComponentType.OBSIDIAN -> {
+                                val swirlPath = Path().apply {
+                                    moveTo(0f, cellSize * 0.5f)
+                                    quadraticTo(cellSize * 0.5f, cellSize * 0.2f, cellSize, cellSize * 0.7f)
                                 }
-                                Direction.UP -> {
-                                    drawLine(arrowColor, start = Offset(cx, cellSize*0.8f), end = Offset(cx, cellSize*0.2f), strokeWidth = 4f)
-                                    drawLine(arrowColor, start = Offset(cx, cellSize*0.2f), end = Offset(cx - cellSize*0.2f, cellSize*0.5f), strokeWidth = 4f)
-                                    drawLine(arrowColor, start = Offset(cx, cellSize*0.2f), end = Offset(cx + cellSize*0.2f, cellSize*0.5f), strokeWidth = 4f)
+                                drawPath(swirlPath, Color(0xFF6A1B9A), style = Stroke(2.2f))
+                            }
+                            ComponentType.BEDROCK -> {
+                                drawRect(Color(0xFF333333), topLeft = Offset(cellSize*0.1f, cellSize*0.1f), size = Size(cellSize*0.8f, cellSize*0.8f), style = Stroke(2f))
+                                drawCircle(Color(0xFF424242), radius = cellSize*0.06f, center = Offset(cellSize*0.25f, cellSize*0.25f))
+                                drawCircle(Color(0xFF424242), radius = cellSize*0.06f, center = Offset(cellSize*0.75f, cellSize*0.75f))
+                                drawCircle(Color(0xFF424242), radius = cellSize*0.06f, center = Offset(cellSize*0.25f, cellSize*0.75f))
+                                drawCircle(Color(0xFF424242), radius = cellSize*0.06f, center = Offset(cellSize*0.75f, cellSize*0.25f))
+                            }
+                            ComponentType.BRICK -> {
+                                drawLine(Color(0xFFB71C1C), start = Offset(0f, cellSize*0.33f), end = Offset(cellSize, cellSize*0.33f), strokeWidth = 2f)
+                                drawLine(Color(0xFFB71C1C), start = Offset(0f, cellSize*0.66f), end = Offset(cellSize, cellSize*0.66f), strokeWidth = 2f)
+                                drawLine(Color(0xFFB71C1C), start = Offset(cellSize*0.5f, 0f), end = Offset(cellSize*0.5f, cellSize*0.33f), strokeWidth = 2f)
+                                drawLine(Color(0xFFB71C1C), start = Offset(cellSize*0.25f, cellSize*0.33f), end = Offset(cellSize*0.25f, cellSize*0.66f), strokeWidth = 2f)
+                                drawLine(Color(0xFFB71C1C), start = Offset(cellSize*0.75f, cellSize*0.33f), end = Offset(cellSize*0.75f, cellSize*0.66f), strokeWidth = 2f)
+                                drawLine(Color(0xFFB71C1C), start = Offset(cellSize*0.5f, cellSize*0.66f), end = Offset(cellSize*0.5f, cellSize), strokeWidth = 2f)
+                            }
+                            ComponentType.DIAMOND -> {
+                                val dPath = Path().apply {
+                                    moveTo(cx, cellSize * 0.15f)
+                                    lineTo(cellSize * 0.85f, cy)
+                                    lineTo(cx, cellSize * 0.85f)
+                                    lineTo(cellSize * 0.15f, cy)
+                                    close()
                                 }
-                                Direction.DOWN -> {
-                                    drawLine(arrowColor, start = Offset(cx, cellSize*0.2f), end = Offset(cx, cellSize*0.8f), strokeWidth = 4f)
-                                    drawLine(arrowColor, start = Offset(cx, cellSize*0.8f), end = Offset(cx - cellSize*0.2f, cellSize*0.5f), strokeWidth = 4f)
-                                    drawLine(arrowColor, start = Offset(cx, cellSize*0.8f), end = Offset(cx + cellSize*0.2f, cellSize*0.5f), strokeWidth = 4f)
+                                drawPath(dPath, matColor)
+                                drawPath(dPath, Color.White, style = Stroke(1.5f))
+                                drawLine(Color.White, start = Offset(cx, cellSize * 0.15f), end = Offset(cx, cellSize * 0.85f), strokeWidth = 1f)
+                                drawLine(Color.White, start = Offset(cellSize * 0.15f, cy), end = Offset(cellSize * 0.85f, cy), strokeWidth = 1f)
+                            }
+                            ComponentType.STEEL -> {
+                                drawRect(Color(0xFF78909C), topLeft = Offset(0f, 0f), size = Size(cellSize, cellSize), style = Stroke(2.0f))
+                                val steelShine = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color.Transparent, Color(0x33FFFFFF), Color.Transparent))
+                                drawRect(steelShine, size = Size(cellSize, cellSize))
+                                drawCircle(Color(0xFF455A64), radius = 2f, center = Offset(4f, 4f))
+                                drawCircle(Color(0xFF455A64), radius = 2f, center = Offset(cellSize - 4f, 4f))
+                                drawCircle(Color(0xFF455A64), radius = 2f, center = Offset(4f, cellSize - 4f))
+                                drawCircle(Color(0xFF455A64), radius = 2f, center = Offset(cellSize - 4f, cellSize - 4f))
+                            }
+                            ComponentType.COPPER -> {
+                                val copperR = if (component.isPowered) Color(0xFFFF5722) else Color(0xFFA23210)
+                                drawLine(copperR, start = Offset(cellSize * 0.2f, 0f), end = Offset(cellSize * 0.2f, cellSize), strokeWidth = 1.5f)
+                                drawLine(copperR, start = Offset(cellSize * 0.5f, 0f), end = Offset(cellSize * 0.5f, cellSize), strokeWidth = 2.5f)
+                                drawLine(copperR, start = Offset(cellSize * 0.8f, 0f), end = Offset(cellSize * 0.8f, cellSize), strokeWidth = 1.5f)
+                            }
+                            ComponentType.GOLD -> {
+                                drawRect(Color(0xFFFFB300), topLeft = Offset(0f, 0f), size = Size(cellSize, cellSize), style = Stroke(2.5f))
+                                val goldShine = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color.Transparent, Color(0x77FFFFFF), Color.Transparent))
+                                drawRect(goldShine, size = Size(cellSize, cellSize))
+                                drawLine(Color.White, start = Offset(cx - 3f, cy - 3f), end = Offset(cx + 3f, cy + 3f), strokeWidth = 1.5f)
+                                drawLine(Color.White, start = Offset(cx + 3f, cy - 3f), end = Offset(cx - 3f, cy + 3f), strokeWidth = 1.5f)
+                            }
+                            ComponentType.ALUMINUM -> {
+                                for(i in 1..3) {
+                                    val h = i * (cellSize / 4)
+                                    drawLine(Color(0x33FFFFFF), start = Offset(0f, h), end = Offset(cellSize, h), strokeWidth = 1f)
                                 }
                             }
+                            ComponentType.PIPE -> {
+                                val arrowColor = Color(0xFF00E676)
+                                drawRect(Color(0xFF263238), topLeft = Offset(cellSize*0.2f, cellSize*0.2f), size = Size(cellSize*0.6f, cellSize*0.6f))
+                                when (component.direction) {
+                                    Direction.RIGHT -> {
+                                        drawLine(arrowColor, start = Offset(cellSize*0.2f, cy), end = Offset(cellSize*0.8f, cy), strokeWidth = 4f)
+                                        drawLine(arrowColor, start = Offset(cellSize*0.8f, cy), end = Offset(cellSize*0.5f, cy - cellSize*0.2f), strokeWidth = 4f)
+                                        drawLine(arrowColor, start = Offset(cellSize*0.8f, cy), end = Offset(cellSize*0.5f, cy + cellSize*0.2f), strokeWidth = 4f)
+                                    }
+                                    Direction.LEFT -> {
+                                        drawLine(arrowColor, start = Offset(cellSize*0.8f, cy), end = Offset(cellSize*0.2f, cy), strokeWidth = 4f)
+                                        drawLine(arrowColor, start = Offset(cellSize*0.2f, cy), end = Offset(cellSize*0.5f, cy - cellSize*0.2f), strokeWidth = 4f)
+                                        drawLine(arrowColor, start = Offset(cellSize*0.2f, cy), end = Offset(cellSize*0.5f, cy + cellSize*0.2f), strokeWidth = 4f)
+                                    }
+                                    Direction.UP -> {
+                                        drawLine(arrowColor, start = Offset(cx, cellSize*0.8f), end = Offset(cx, cellSize*0.2f), strokeWidth = 4f)
+                                        drawLine(arrowColor, start = Offset(cx, cellSize*0.2f), end = Offset(cx - cellSize*0.2f, cellSize*0.5f), strokeWidth = 4f)
+                                        drawLine(arrowColor, start = Offset(cx, cellSize*0.2f), end = Offset(cx + cellSize*0.2f, cellSize*0.5f), strokeWidth = 4f)
+                                    }
+                                    Direction.DOWN -> {
+                                        drawLine(arrowColor, start = Offset(cx, cellSize*0.2f), end = Offset(cx, cellSize*0.8f), strokeWidth = 4f)
+                                        drawLine(arrowColor, start = Offset(cx, cellSize*0.8f), end = Offset(cx - cellSize*0.2f, cellSize*0.5f), strokeWidth = 4f)
+                                        drawLine(arrowColor, start = Offset(cx, cellSize*0.8f), end = Offset(cx + cellSize*0.2f, cellSize*0.5f), strokeWidth = 4f)
+                                    }
+                                }
+                            }
+                            else -> {
+                                // Default simple shine gradient for any unhandled solid elements
+                                val fineShine = androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color.Transparent, Color(0x33FFFFFF), Color.Transparent))
+                                drawRect(fineShine, size = Size(cellSize, cellSize))
+                            }
                         }
+
                         if (component.type == ComponentType.INFINITE_WATER || 
                             component.type == ComponentType.INFINITE_LAVA ||
                             component.type == ComponentType.INFINITE_OIL ||

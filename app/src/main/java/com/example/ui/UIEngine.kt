@@ -443,6 +443,7 @@ object UIEngine {
         onToolSelected: (ComponentType) -> Unit
     ) {
         var isCollapsed by remember { mutableStateOf(false) }
+        var searchQuery by remember { mutableStateOf("") }
 
         // Find which MasterTab belongs to the currently active category
         val currentMasterTab = remember(selectedCategory) {
@@ -577,12 +578,60 @@ object UIEngine {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Premium Intelligent Real-time Multilingual Search Bar
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                        placeholder = {
+                            Text(
+                                text = if (lang == AppLanguage.RU) "Поиск среди 220+ элементов..."
+                                       else if (lang == AppLanguage.UK) "Пошук серед 220+ елементів..."
+                                       else "Search 220+ elements...",
+                                fontSize = 12.sp,
+                                color = Color.Gray
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color(0xFF00FFCC))
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color.LightGray)
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // Display filtered component list inside clean responsive grid
-                    val componentsInCategory = remember(selectedCategory) {
-                        ComponentType.values().filter {
-                            it.category == selectedCategory && !it.name.startsWith("INFINITE_")
+                    val componentsToShow = remember(selectedCategory, searchQuery) {
+                        val query = searchQuery.trim().lowercase()
+                        if (query.isEmpty()) {
+                            ComponentType.values().filter {
+                                it.category == selectedCategory && !it.name.startsWith("INFINITE_")
+                            }
+                        } else {
+                            ComponentType.values().filter { type ->
+                                val nameEn = type.name.lowercase()
+                                val nameDnEn = Lang.getComponentDisplayName(type, AppLanguage.EN).lowercase()
+                                val nameDnRu = Lang.getComponentDisplayName(type, AppLanguage.RU).lowercase()
+                                val nameDnUk = Lang.getComponentDisplayName(type, AppLanguage.UK).lowercase()
+                                !type.name.startsWith("INFINITE_") && (
+                                    nameEn.contains(query) ||
+                                    nameDnEn.contains(query) ||
+                                    nameDnRu.contains(query) ||
+                                    nameDnUk.contains(query)
+                                )
+                            }
                         }
                     }
 
@@ -595,7 +644,7 @@ object UIEngine {
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(componentsInCategory) { type ->
+                        items(componentsToShow) { type ->
                             ToolButton(
                                 icon = com.example.ui.getIconForType(type),
                                 text = Lang.getComponentDisplayName(type, lang),

@@ -255,19 +255,56 @@ class CircuitEngine {
                     }
                     newLogicState = maxTemp > threshold
                 } else if (comp.type == ComponentType.LIGHT_SENSOR) {
-                    var illuminated = false
-                    val dxs = intArrayOf(-1, 1, 0, 0)
-                    val dys = intArrayOf(0, 0, -1, 1)
-                    for (i in 0..3) {
-                        val nx = x + dxs[i]; val ny = y + dys[i]
-                        if (nx in 0 until width && ny in 0 until height) {
-                            val adj = grid[nx][ny]
-                            if (adj.isPowered && (adj.type == ComponentType.BULB || adj.type == ComponentType.LED || adj.type == ComponentType.RGB_LED || adj.type == ComponentType.LASER_DIODE)) {
-                                illuminated = true
-                            }
-                        }
-                    }
-                    newLogicState = illuminated
+                    newLogicState = LightSensor.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.HUMIDITY_SENSOR) {
+                    newLogicState = HumiditySensor.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.SOUND_SENSOR) {
+                    newLogicState = SoundSensor.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.GAS_SENSOR) {
+                    newLogicState = GasSensor.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.MOISTURE_SENSOR) {
+                    newLogicState = MoistureSensor.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.ACCELEROMETER) {
+                    newLogicState = Accelerometer.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.GYROSCOPE) {
+                    newLogicState = Gyroscope.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.MAGNETOMETER) {
+                    newLogicState = Magnetometer.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.BAROMETER) {
+                    newLogicState = Barometer.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.PRESSURE_SENSOR) {
+                    newLogicState = PressureSensor.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.PROXIMITY_SENSOR) {
+                    newLogicState = ProximitySensor.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.ULTRASONIC_SENSOR) {
+                    newLogicState = UltrasonicSensor.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.PIR_MOTION_SENSOR) {
+                    val dummyMoved = Array(width) { BooleanArray(height) { true } }
+                    newLogicState = PirMotionSensor.simulate(grid, x, y, comp, width, height, dummyMoved).logicState
+                } else if (comp.type == ComponentType.HALL_EFFECT_SENSOR) {
+                    newLogicState = HallEffectSensor.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.PH_SENSOR) {
+                    newLogicState = PhSensor.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.UV_SENSOR) {
+                    newLogicState = UvSensor.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.COLOR_SENSOR) {
+                    newLogicState = ColorSensor.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.FINGERPRINT_SCANNER) {
+                    newLogicState = FingerprintScanner.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.CAMERA_MODULE) {
+                    newLogicState = CameraModule.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.MICROPHONE) {
+                    newLogicState = Microphone.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.IC_7408_AND) {
+                    newLogicState = Ic7408And.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.IC_7432_OR) {
+                    newLogicState = Ic7432Or.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.IC_7404_NOT) {
+                    newLogicState = Ic7404Not.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.IC_CD4017_DECADE) {
+                    newLogicState = IcCd4017Decade.simulate(grid, x, y, comp, width, height).logicState
+                } else if (comp.type == ComponentType.IC_L298N_MOTOR) {
+                    newLogicState = IcL298nMotor.simulate(grid, x, y, comp, width, height).logicState
                 }
                 
                 val newCharge = if (EnergyEngine.isPowerSource(comp.type) && (comp.charge < 0f || comp.charge.isNaN())) {

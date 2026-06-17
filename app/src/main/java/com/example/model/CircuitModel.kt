@@ -224,7 +224,22 @@ enum class ComponentType(val category: ComponentCategory) {
     CLAY(ComponentCategory.MATERIALS),
     BRICK(ComponentCategory.MATERIALS),
     OBSIDIAN(ComponentCategory.MATERIALS),
-    BEDROCK(ComponentCategory.MATERIALS)
+    BEDROCK(ComponentCategory.MATERIALS),
+    
+    PLASMA(ComponentCategory.HYDRAULICS),
+    INFINITE_PLASMA(ComponentCategory.HYDRAULICS),
+    BLACK_HOLE(ComponentCategory.MATERIALS),
+    PORTAL_IN(ComponentCategory.OUTPUTS),
+    PORTAL_OUT(ComponentCategory.OUTPUTS),
+    TESLA_COIL(ComponentCategory.POWER),
+    MERCURY(ComponentCategory.HYDRAULICS),
+    LIGHTNING_ROD(ComponentCategory.POWER),
+    STIRLING_ENGINE(ComponentCategory.POWER),
+    QUANTUM_SUPERCONDUCTOR(ComponentCategory.CONDUCTORS),
+    PCM_CELL(ComponentCategory.MATERIALS),
+    LASER_RECEIVER(ComponentCategory.SENSORS),
+    GRAPHITE_ROD(ComponentCategory.MATERIALS),
+    PIEZO_SENSOR(ComponentCategory.SENSORS)
 }
 
 enum class Direction { 

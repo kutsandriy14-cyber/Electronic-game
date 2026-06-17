@@ -382,6 +382,20 @@ object Lang {
             ComponentType.COPPER -> if (lang == AppLanguage.RU) "Медь" else "Мідь"
             ComponentType.GOLD -> if (lang == AppLanguage.RU) "Золото" else "Золото"
             ComponentType.PLASTIC -> if (lang == AppLanguage.RU) "Пластик" else "Пластик"
+            ComponentType.PLASMA -> if (lang == AppLanguage.RU) "Плазма" else if (lang == AppLanguage.UK) "Плазма" else "Plasma"
+            ComponentType.INFINITE_PLASMA -> if (lang == AppLanguage.RU) "Источник плазмы" else if (lang == AppLanguage.UK) "Джерело плазми" else "Infinite Plasma"
+            ComponentType.BLACK_HOLE -> if (lang == AppLanguage.RU) "Черная дыра" else if (lang == AppLanguage.UK) "Чорна діра" else "Black Hole"
+            ComponentType.PORTAL_IN -> if (lang == AppLanguage.RU) "Портал (Вход)" else if (lang == AppLanguage.UK) "Портал (Вхід)" else "Portal (In)"
+            ComponentType.PORTAL_OUT -> if (lang == AppLanguage.RU) "Портал (Выход)" else if (lang == AppLanguage.UK) "Портал (Вихід)" else "Portal (Out)"
+            ComponentType.TESLA_COIL -> if (lang == AppLanguage.RU) "Катушка Тесла" else if (lang == AppLanguage.UK) "Котушка Тесла" else "Tesla Coil"
+            ComponentType.MERCURY -> if (lang == AppLanguage.RU) "Ртуть" else if (lang == AppLanguage.UK) "Ртуть" else "Mercury"
+            ComponentType.LIGHTNING_ROD -> if (lang == AppLanguage.RU) "Громоотвод" else if (lang == AppLanguage.UK) "Блискавковідвід" else "Lightning Rod"
+            ComponentType.STIRLING_ENGINE -> if (lang == AppLanguage.RU) "Двигатель Стирлинга" else if (lang == AppLanguage.UK) "Двигун Стірлінга" else "Stirling Engine"
+            ComponentType.QUANTUM_SUPERCONDUCTOR -> if (lang == AppLanguage.RU) "Квантовый Сверхпроводник" else if (lang == AppLanguage.UK) "Квантовий Надпровідник" else "Quantum Superconductor"
+            ComponentType.PCM_CELL -> if (lang == AppLanguage.RU) "ФАЗ-Элемент" else if (lang == AppLanguage.UK) "ФАЗ-Елемент" else "PCM Thermal Cell"
+            ComponentType.LASER_RECEIVER -> if (lang == AppLanguage.RU) "Лазерный Приемник" else if (lang == AppLanguage.UK) "Лазерний Приймач" else "Laser Receiver"
+            ComponentType.GRAPHITE_ROD -> if (lang == AppLanguage.RU) "Графитовый Стержень" else if (lang == AppLanguage.UK) "Графітовий Стрижень" else "Graphite Rod"
+            ComponentType.PIEZO_SENSOR -> if (lang == AppLanguage.RU) "Пьезодатчик" else if (lang == AppLanguage.UK) "П'єзодатчик" else "Piezo Sensor"
             else -> type.name.replace("_ANY", "").replace("_OPEN", "").replace("_CLOSED", "").replace("_", " ")
         }
     }

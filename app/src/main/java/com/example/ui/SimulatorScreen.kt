@@ -1321,13 +1321,13 @@ fun getIconForType(type: ComponentType): ImageVector {
         ComponentType.SAND, ComponentType.DIRT, ComponentType.STONE -> Icons.Default.Landscape
         ComponentType.GLASS -> Icons.Default.Window
         ComponentType.WOOD -> Icons.Default.Forest
-        ComponentType.SLIME -> Icons.Default.Biotech
+        ComponentType.SLIME, ComponentType.INFINITE_SLIME -> Icons.Default.Biotech
         ComponentType.RUBBER -> Icons.Default.Album
         ComponentType.DIAMOND -> Icons.Default.Diamond
         ComponentType.COAL -> Icons.Default.Co2
         ComponentType.SPONGE -> Icons.Default.CropSquare
-        ComponentType.GASOLINE -> Icons.Default.LocalGasStation
-        ComponentType.LIQUID_NITROGEN -> Icons.Default.SevereCold
+        ComponentType.GASOLINE, ComponentType.INFINITE_GASOLINE -> Icons.Default.LocalGasStation
+        ComponentType.LIQUID_NITROGEN, ComponentType.INFINITE_LIQUID_NITROGEN -> Icons.Default.SevereCold
         ComponentType.URANIUM -> Icons.Default.Warning
         ComponentType.MAGIC_DUST -> Icons.Default.AutoAwesome
         ComponentType.PIPE -> Icons.Default.Tune
@@ -1335,6 +1335,78 @@ fun getIconForType(type: ComponentType): ImageVector {
         ComponentType.CONVEYOR_BELT -> Icons.Default.LinearScale
         ComponentType.PISTON -> Icons.Default.ArrowUpward
         ComponentType.DOUBLE_DOOR -> Icons.Default.MeetingRoom
+        
+        // Additional Hydraulics & infinite fluids
+        ComponentType.HELIUM -> Icons.Default.Air
+        ComponentType.HYDROGEN, ComponentType.METHANE, ComponentType.CARBON_DIOXIDE -> Icons.Default.Cloud
+        ComponentType.INFINITE_OIL -> Icons.Default.WaterDrop
+        ComponentType.INFINITE_ACID -> Icons.Default.Water
+        ComponentType.INFINITE_STEAM -> Icons.Default.Cloud
+        
+        // Additional Switches & I/O
+        ComponentType.KEYPAD_4X4 -> Icons.Default.Dialpad
+        ComponentType.PUSH_BUTTON_UP -> Icons.Default.ArrowUpward
+        ComponentType.PUSH_BUTTON_DOWN -> Icons.Default.ArrowDownward
+        ComponentType.PUSH_BUTTON_LEFT -> Icons.Default.ArrowBack
+        ComponentType.PUSH_BUTTON_RIGHT -> Icons.Default.ArrowForward
+        ComponentType.JOYSTICK -> Icons.Default.SportsEsports
+        ComponentType.ENCODER -> Icons.Default.Cached
+        
+        // Power Converters
+        ComponentType.STEP_DOWN_CONVERTER -> Icons.Default.ArrowDownward
+        ComponentType.STEP_UP_CONVERTER -> Icons.Default.ArrowUpward
+        ComponentType.INVERTER -> Icons.Default.CompareArrows
+        
+        // Additional Sensors
+        ComponentType.ACCELEROMETER -> Icons.Default.ScreenRotation
+        ComponentType.GYROSCOPE -> Icons.Default.RotateLeft
+        ComponentType.MAGNETOMETER -> Icons.Default.Explore
+        ComponentType.BAROMETER -> Icons.Default.Speed
+        ComponentType.PRESSURE_SENSOR -> Icons.Default.Compress
+        ComponentType.HUMIDITY_SENSOR -> Icons.Default.WaterDrop
+        ComponentType.COLOR_SENSOR -> Icons.Default.Palette
+        ComponentType.FINGERPRINT_SCANNER -> Icons.Default.Fingerprint
+        ComponentType.CAMERA_MODULE -> Icons.Default.CameraAlt
+        ComponentType.MICROPHONE -> Icons.Default.Mic
+        ComponentType.UV_SENSOR -> Icons.Default.WbSunny
+        ComponentType.PH_SENSOR -> Icons.Default.Science
+        
+        // Additional Outputs
+        ComponentType.DISPLAY_7SEG_4DIGIT -> Icons.Default.DisplaySettings
+        ComponentType.DISPLAY_OLED_128X64 -> Icons.Default.Tv
+        ComponentType.DISPLAY_TFT_24 -> Icons.Default.Monitor
+        ComponentType.E_PAPER_DISPLAY -> Icons.Default.Description
+        ComponentType.VIBRATION_MOTOR -> Icons.Default.Vibration
+        ComponentType.SOLENOID -> Icons.Default.Bolt
+        ComponentType.LINEAR_ACTUATOR -> Icons.Default.SettingsEthernet
+        ComponentType.RELAY_MODULE_4CH -> Icons.Default.Layers
+        ComponentType.PELTIER_MODULE -> Icons.Default.Thermostat
+        
+        // Digital Logic & ICs (74-series, LM-series)
+        ComponentType.IC_7400_NAND, ComponentType.IC_7402_NOR, ComponentType.IC_7404_NOT,
+        ComponentType.IC_7408_AND, ComponentType.IC_7432_OR, ComponentType.IC_7486_XOR,
+        ComponentType.IC_7447_DECODER, ComponentType.IC_CD4017_DECADE, ComponentType.IC_LM358_OPAMP,
+        ComponentType.IC_LM324_OPAMP, ComponentType.IC_LM317_REG, ComponentType.IC_L298N_MOTOR,
+        ComponentType.IC_ULN2003 -> Icons.Default.DeveloperBoard
+        
+        // Additional Materials
+        ComponentType.STEEL, ComponentType.COPPER, ComponentType.GOLD, ComponentType.ALUMINUM -> Icons.Default.GridOn
+        ComponentType.PLASTIC, ComponentType.CLAY, ComponentType.BRICK, ComponentType.OBSIDIAN -> Icons.Default.Category
+        ComponentType.BEDROCK -> Icons.Default.Lock
+        
+        ComponentType.PLASMA, ComponentType.INFINITE_PLASMA -> Icons.Default.Whatshot
+        ComponentType.BLACK_HOLE -> Icons.Default.Adjust
+        ComponentType.PORTAL_IN -> Icons.Default.Login
+        ComponentType.PORTAL_OUT -> Icons.Default.Logout
+        ComponentType.TESLA_COIL -> Icons.Default.FlashOn
+        ComponentType.MERCURY -> Icons.Default.Opacity
+        ComponentType.LIGHTNING_ROD -> Icons.Default.Bolt
+        ComponentType.STIRLING_ENGINE -> Icons.Default.Cyclone
+        ComponentType.QUANTUM_SUPERCONDUCTOR -> Icons.Default.Cable
+        ComponentType.PCM_CELL -> Icons.Default.AcUnit
+        ComponentType.LASER_RECEIVER -> Icons.Default.Radar
+        ComponentType.GRAPHITE_ROD -> Icons.Default.ViewWeek
+        ComponentType.PIEZO_SENSOR -> Icons.Default.SettingsVoice
         else -> {
             when (type.category) {
                 ComponentCategory.LOGIC -> Icons.Default.AccountTree
