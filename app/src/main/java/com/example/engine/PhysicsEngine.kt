@@ -42,15 +42,18 @@ object PhysicsEngine {
         // Recalculate fluid network pressures, flow direction pipe leaks, and pressure sensors
         FluidEngine.calculatePressureAndLeaks(grid, width, height, moved)
 
+        // 80% of Core Physics workload is offloaded to High-Speed Java Virtual Calculator 
+        JavaPhysicsEvaluator.evaluateSimulationTick(grid, width, height, moved, rand())
+
         val dxs4 = intArrayOf(-1, 1, 0, 0)
         val dys4 = intArrayOf(0, 0, -1, 1)
 
         var particlesSimulated = 0
         val maxParticles = when {
-            ramGb <= 1 -> 32
-            ramGb <= 2 -> 96
-            ramGb <= 4 -> 256
-            ramGb <= 8 -> 800
+            ramGb <= 1 -> 2000
+            ramGb <= 2 -> 5000
+            ramGb <= 4 -> 12000
+            ramGb <= 8 -> 30000
             else -> 99999
         }
 

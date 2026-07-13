@@ -1074,7 +1074,7 @@ object RenderEngine {
                             ComponentType.ALUMINUM -> Color(0xFFCFD8DC)
                             ComponentType.PLASTIC -> Color(0xFFFFCC80)
                             ComponentType.CLAY -> Color(0xFFBCAAA4)
-                            ComponentType.BRICK -> Color(0xFFD32F2F)
+                            ComponentType.BRICK -> Color(android.graphics.Color.parseColor(com.example.engine.JavaModEngine.brickColorHex))
                             ComponentType.OBSIDIAN -> Color(0xFF1C1C1C)
                             ComponentType.BEDROCK -> Color(0xFF000000)
                             

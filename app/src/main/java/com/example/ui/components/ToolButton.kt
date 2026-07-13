@@ -25,26 +25,26 @@ fun ToolButton(icon: ImageVector, text: String, isSelected: Boolean, onClick: ()
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(84.dp) // Fixed height to allow clean vertical layouts without clipping text
+            .height(58.dp) // Compact height to prevent taking too much screen space
             .clickable(onClick = onClick)
-            .background(bgColor, shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
-            .border(1.dp, borderColor, androidx.compose.foundation.shape.RoundedCornerShape(14.dp)),
+            .background(bgColor, shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .border(1.dp, borderColor, androidx.compose.foundation.shape.RoundedCornerShape(10.dp)),
         contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally, 
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(6.dp)
+            modifier = Modifier.padding(2.dp)
         ) {
-            Icon(icon, contentDescription = text, tint = tint, modifier = Modifier.size(24.dp))
-            Spacer(modifier = Modifier.height(6.dp))
+            Icon(icon, contentDescription = text, tint = tint, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = text, 
                 style = MaterialTheme.typography.labelSmall, 
-                fontSize = 9.sp,
+                fontSize = 8.sp,
                 color = tint, 
-                maxLines = 2, // Allow wrapping for complete translation views!
-                lineHeight = 11.sp,
+                maxLines = 1, // Compact single line
+                lineHeight = 10.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )

@@ -47,12 +47,27 @@ object Uranium {
             }
         }
 
+        // Graphite control rods absorb thermal neutrons and dampen the nuclear reaction
+        var graphiteDampeningCount = 0
+        for (i in 0..3) {
+            val nx = x + dxs4[i]
+            val ny = y + dys4[i]
+            if (nx in 0 until width && ny in 0 until height && grid[nx][ny].type == ComponentType.GRAPHITE_ROD) {
+                graphiteDampeningCount++
+            }
+        }
+
         // Clustering increases thermal production significantly
         if (uNeighbors >= 1) currentTemp += 40f
         if (uNeighbors >= 2) currentTemp += 180f
         if (uNeighbors >= 3) currentTemp += 450f
 
-        val isCritical = currentTemp > 1200f
+        // Dampen fission reaction based on control rod insertion count
+        if (graphiteDampeningCount > 0) {
+            currentTemp = (currentTemp - (graphiteDampeningCount * 600f)).coerceAtLeast(20f)
+        }
+
+        val isCritical = currentTemp > 1200f && graphiteDampeningCount == 0
 
         // Critical status: runaway self-heating up to extreme limits
         if (isCritical) {
@@ -89,6 +104,17 @@ object Uranium {
         // Cap temperature (runaway melts up to 100,000 degrees!)
         val maxUraniumTemp = if (isCritical) 100000f else PhysicsConstants.URANIUM_MAX_TEMP
         currentTemp = currentTemp.coerceIn(20f, maxUraniumTemp)
+
+        // Runaway Uranium melts itself into active flowing Corium slag (Elephant's Foot)
+        if (isCritical && rand() < 0.08) {
+            grid[x][y] = GridComponent(
+                type = ComponentType.CORIUM,
+                temperature = currentTemp
+            )
+            moved[x][y] = true
+            return
+        }
+
         grid[x][y] = comp.copy(temperature = currentTemp)
 
         // 32x32 liquid evaporation in vicinity under extreme heat
@@ -122,11 +148,11 @@ object Uranium {
                     if (nx in 0 until width && ny in 0 until height) {
                         val neighbor = grid[nx][ny]
                         val nType = neighbor.type
-                        if (nType != ComponentType.EMPTY && nType != ComponentType.URANIUM && nType != ComponentType.BEDROCK) {
+                        if (nType != ComponentType.EMPTY && nType != ComponentType.URANIUM && nType != ComponentType.CORIUM && nType != ComponentType.BEDROCK) {
                             if (rand() < 0.20) {
-                                // Melt nearby structure into active flowing molten Uranium/Corium slag
+                                // Melt nearby structure into active flowing molten Corium slag
                                 grid[nx][ny] = GridComponent(
-                                    type = ComponentType.URANIUM,
+                                    type = ComponentType.CORIUM,
                                     temperature = currentTemp
                                 )
                                 moved[nx][ny] = true

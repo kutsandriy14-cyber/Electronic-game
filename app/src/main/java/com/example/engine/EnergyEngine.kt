@@ -193,7 +193,8 @@ object EnergyEngine {
         val resistanceCache = Array(width) { x -> Array(height) { y -> 
             val p = propsCache[x][y]
             val type = grid[x][y].type
-            addDynamicResistanceForComponent(grid, x, y, type, p) 
+            val baseRes = addDynamicResistanceForComponent(grid, x, y, type, p)
+            JavaModManager.calculateCircuitResistance(baseRes)
         }}
 
         // 1. Initial scan for active power sources & calculate instant voltages (AC/DC)
@@ -562,8 +563,9 @@ object EnergyEngine {
                     val heatGain = powerWatts * 1.5f // degrees celsius per watt per tick
                     val thermalMassFactor = getThermalMassCoefficient(comp.type)
                     val nextTemp = comp.temperature + (heatGain / thermalMassFactor)
-                    // Thermal dissipation decay to surrounding ambient
-                    val decayCoeff = 0.045f * getThermalDissipationFactor(comp.type)
+                    // Thermal dissipation decay to surrounding ambient (modified heavily by JavaModManager)
+                    val decayMult = if (JavaModManager.isModThermalShield()) 4.5f else 1.0f
+                    val decayCoeff = 0.045f * getThermalDissipationFactor(comp.type) * decayMult
                     var thermalDischarge = nextTemp - (nextTemp - localAmbient) * decayCoeff
                     if (thermalDischarge.isNaN()) {
                         thermalDischarge = localAmbient
@@ -571,10 +573,14 @@ object EnergyEngine {
                     
                     // Melt/Burn threshold check
                     val meltTemp = getComponentMeltingTemperature(comp.type)
-                    if (thermalDischarge >= meltTemp) {
-                        finalOverloaded = true
-                        // Toxic melt smoke logs
+                    if (thermalDischarge >= meltTemp && comp.type != ComponentType.BEDROCK && comp.type != ComponentType.EMPTY && comp.type != ComponentType.CORIUM) {
+                        // Critical temperature levels trigger a block state transition into 'Corium' material rather than just a red overlay!
+                        grid[x][y] = GridComponent(
+                            type = ComponentType.CORIUM,
+                            temperature = thermalDischarge
+                        )
                         isShortCircuit = true
+                        continue
                     }
 
                     // Specific states
@@ -605,7 +611,8 @@ object EnergyEngine {
                     
                     // Cool down inactive elements to historical surrounding local ambient
                     val localAmbient = ambientGrid[x][y]
-                    val decayCoeff = 0.045f * getThermalDissipationFactor(comp.type)
+                    val decayMult = if (JavaModManager.isModThermalShield()) 4.5f else 1.0f
+                    val decayCoeff = 0.045f * getThermalDissipationFactor(comp.type) * decayMult
                     var thermalDischarge = comp.temperature - (comp.temperature - localAmbient) * decayCoeff
                     if (thermalDischarge.isNaN()) {
                         thermalDischarge = localAmbient
@@ -644,13 +651,28 @@ object EnergyEngine {
                     if (totalDischargeCurrentMa > ratingThreshold && type != ComponentType.INFINITE_BATTERY) {
                         isOverloadedNow = true
                     }
+
+                    // Plus battery power wattage-based overload checking (User request: "просто вати как овер лоад")
+                    val maxV = CircuitUtils.propFloat(propsCache[x][y], "v", getDefaultVoltage(type))
+                    val drawAmps = totalDischargeCurrentMa / 1000f
+                    val currentWattsOutput = drawAmps * maxV
+                    val maxWattsLimit = getMaxRatedPowerWatts(type)
+                    val ratingThresholdWatts = if (propsCache[x][y]["mode"]?.uppercase() == "BOOST") maxWattsLimit * 1.5f else maxWattsLimit * 1.2f
+                    if (currentWattsOutput > ratingThresholdWatts && type != ComponentType.INFINITE_BATTERY) {
+                        isOverloadedNow = true
+                    }
                     
                     // Generate dynamic thermal heating inside current sources!
                     val srcAmps = totalDischargeCurrentMa / 1000f
                     val srcR = if (Battery.isBattery(type)) 0.15f else 0.45f
                     val srcWatts = srcAmps * srcAmps * srcR
                     val localAmbient = ambientGrid[x][y]
-                    val srcHeatGain = srcWatts * 2.2f
+                    var srcHeatGain = srcWatts * 2.2f
+                    if (type == ComponentType.NUCLEAR_REACTOR) {
+                        val rodsVal = CircuitUtils.propFloat(propsCache[x][y], "rods", 80f)
+                        val reactionHeat = 12f * (rodsVal / 100f) * (rodsVal / 100f)
+                        srcHeatGain += reactionHeat
+                    }
                     var srcNextTemp = comp.temperature + srcHeatGain
                     
                     // ECO cools down generator because of throttled load levels
@@ -660,8 +682,12 @@ object EnergyEngine {
                     
                     var srcThermalDischarge = srcNextTemp - (srcNextTemp - localAmbient) * 0.05f
                     if (srcThermalDischarge.isNaN()) srcThermalDischarge = localAmbient
-                    if (srcThermalDischarge >= getComponentMeltingTemperature(type) && type != ComponentType.INFINITE_BATTERY) {
-                        isOverloadedNow = true
+                    if (srcThermalDischarge >= getComponentMeltingTemperature(type) && type != ComponentType.INFINITE_BATTERY && type != ComponentType.BEDROCK && type != ComponentType.CORIUM) {
+                        grid[x][y] = GridComponent(
+                            type = ComponentType.CORIUM,
+                            temperature = srcThermalDischarge
+                        )
+                        continue
                     }
 
                     if (Battery.isBattery(type)) {
@@ -726,6 +752,11 @@ object EnergyEngine {
                         val sagFactor = if (maxI > 0) (totalDischargeCurrentMa / maxI).coerceIn(0f, 1.2f) else 0f
                         var actualGenV = if (isOverloadedNow) 0f else sMaxV * (1f - 0.45f * sagFactor)
                         
+                        if (type == ComponentType.NUCLEAR_REACTOR) {
+                            val rodsVal = CircuitUtils.propFloat(propsCache[x][y], "rods", 80f)
+                            actualGenV *= (rodsVal / 100f)
+                        }
+                        
                         val mode = propsCache[x][y]["mode"] ?: "NORMAL"
                         if (mode.uppercase() == "ECO") actualGenV *= 0.7f
                         if (mode.uppercase() == "BOOST") actualGenV *= 1.35f
@@ -736,7 +767,8 @@ object EnergyEngine {
                             voltage = actualGenV,
                             current = totalDischargeCurrentMa,
                             isOverloaded = isOverloadedNow,
-                            temperature = srcThermalDischarge
+                            temperature = srcThermalDischarge,
+                            charge = if (type == ComponentType.INFINITE_BATTERY) 999999f else comp.charge
                         )
                     }
                     
@@ -873,6 +905,23 @@ object EnergyEngine {
             ComponentType.BATTERY -> 4000f
             ComponentType.BATTERY_PACK -> 12000f
             else -> 100000f
+        }
+    }
+
+    private fun getMaxRatedPowerWatts(type: ComponentType): Float {
+        return when (type) {
+            ComponentType.BATTERY -> 35f
+            ComponentType.BATTERY_PACK -> 250f
+            ComponentType.COIN_CELL -> 5f
+            ComponentType.GENERATOR -> 2000f
+            ComponentType.SOLAR_PANEL -> 75f
+            ComponentType.AC_SOURCE -> 5000f
+            ComponentType.WIND_TURBINE -> 500f
+            ComponentType.GEOTHERMAL_GENERATOR -> 6000f
+            ComponentType.HYDRO_GENERATOR -> 3000f
+            ComponentType.THERMOELECTRIC_GENERATOR -> 200f
+            ComponentType.NUCLEAR_REACTOR -> 100000f
+            else -> 100f
         }
     }
 

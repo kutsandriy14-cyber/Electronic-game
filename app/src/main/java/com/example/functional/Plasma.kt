@@ -17,6 +17,25 @@ object Plasma {
     fun interactWithSurroundings(grid: Array<Array<GridComponent>>, x: Int, y: Int, width: Int, height: Int) {
         val dxs = intArrayOf(-1, 1, 0, 0)
         val dys = intArrayOf(0, 0, -1, 1)
+
+        // Count adjacent Graphite Rods to damp/reduce nuclear fusion synthesis
+        var graphiteCount = 0
+        for (i in 0..3) {
+            val nx = x + dxs[i]
+            val ny = y + dys[i]
+            if (nx in 0 until width && ny in 0 until height && grid[nx][ny].type == ComponentType.GRAPHITE_ROD) {
+                graphiteCount++
+            }
+        }
+
+        // Quench the super-heated fusion plasma reaction when control rods are inserted
+        if (graphiteCount > 0) {
+            if (Math.random() < 0.20 * graphiteCount) {
+                grid[x][y] = GridComponent(ComponentType.STEAM, temperature = 500f)
+                return
+            }
+        }
+
         for (i in 0..3) {
             val nx = x + dxs[i]
             val ny = y + dys[i]

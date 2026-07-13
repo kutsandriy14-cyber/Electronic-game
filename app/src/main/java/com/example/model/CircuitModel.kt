@@ -225,6 +225,7 @@ enum class ComponentType(val category: ComponentCategory) {
     BRICK(ComponentCategory.MATERIALS),
     OBSIDIAN(ComponentCategory.MATERIALS),
     BEDROCK(ComponentCategory.MATERIALS),
+    CORIUM(ComponentCategory.MATERIALS),
     
     PLASMA(ComponentCategory.HYDRAULICS),
     INFINITE_PLASMA(ComponentCategory.HYDRAULICS),
@@ -247,7 +248,7 @@ enum class Direction {
     fun next() = values()[(ordinal + 1) % 4] 
 }
 
-data class GridComponent(
+data class GridComponent @JvmOverloads constructor(
     val type: ComponentType = ComponentType.EMPTY,
     val direction: Direction = Direction.UP,
     val isPowered: Boolean = false,

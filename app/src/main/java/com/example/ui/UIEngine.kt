@@ -76,9 +76,11 @@ object UIEngine {
         lang: AppLanguage,
         isSimulationRunning: Boolean,
         timeMultiplier: Int,
+        brushSize: Int,
         onToggleSimulation: () -> Unit,
         onClearGrid: () -> Unit,
         onSetTimeMultiplier: (Int) -> Unit,
+        onSetBrushSize: (Int) -> Unit,
         onShowWiki: () -> Unit,
         onShowSave: () -> Unit,
         onShowLoad: () -> Unit,
@@ -89,7 +91,7 @@ object UIEngine {
             modifier = modifier
                 .padding(16.dp)
                 .widthIn(max = 600.dp)
-                .fillMaxWidth(0.9f)
+                .fillMaxWidth(0.95f)
                 .background(Color(0xDD1B1B26), shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
                 .border(1.dp, Color(0x3300FFCC), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
                 .padding(horizontal = 8.dp, vertical = 6.dp)
@@ -143,6 +145,45 @@ object UIEngine {
                 }
                 Spacer(modifier = Modifier.width(12.dp))
 
+                // Robust High-fidelity Brush Size Selector (Requested: "зделай розиер кисти штоби делать разного розмера всякое")
+                Icon(
+                    imageVector = Icons.Default.Brush,
+                    contentDescription = "Brush Size",
+                    tint = Color(0xFF00FFCC),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Row(
+                    modifier = Modifier
+                        .background(Color(0xFF13131F), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0x22FFFFFF), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf(1, 3, 5).forEach { size ->
+                        val isSelected = brushSize == size
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    color = if (isSelected) Color(0xFF00FFCC) else Color.Transparent,
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                                )
+                                .clickable { onSetBrushSize(size) }
+                                .padding(horizontal = 6.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "${size}px",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) Color(0xFF1E1E2E) else Color.White
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
                 IconButton(onClick = onShowWiki) {
                     Icon(Icons.AutoMirrored.Filled.MenuBook, "Wiki", tint = Color(0xFF00FFCC))
                 }
@@ -175,6 +216,9 @@ object UIEngine {
         telemetryState: String,
         onTabChanged: (String) -> Unit,
         onStateChanged: (String) -> Unit,
+        allocatedRamGbytes: Int,
+        allocatedCores: Int,
+        clockMhz: Int,
         modifier: Modifier = Modifier
     ) {
         if (telemetryState == "HIDDEN") {
@@ -357,44 +401,87 @@ object UIEngine {
                                 }
                             }
                             "SIM" -> {
+                                var totalAvailableRamKb = 0
+                                var activeMcusCount = 0
+                                var totalRequiredRamKb = 0
+                                var totalRequiredCpuMhz = 0
+                                
+                                for (col in grid) {
+                                    for (comp in col) {
+                                        if (comp.type == ComponentType.MEMORY_RAM && comp.isPowered) {
+                                            val ramProps = com.example.engine.CircuitUtils.parseProps(comp.extraData)
+                                            val kb = ramProps["mem_kb"]?.toIntOrNull() ?: 1024
+                                            totalAvailableRamKb += kb
+                                        } else if (comp.type == ComponentType.MICROCONTROLLER) {
+                                            if (comp.isPowered && !comp.isOverloaded) {
+                                                activeMcusCount++
+                                                val lines = comp.extraData.split('\n')
+                                                val firstLine = lines.firstOrNull()?.trim() ?: ""
+                                                val hasProps = firstLine.contains("=") && (firstLine.contains("cores") || firstLine.contains("mhz") || firstLine.contains("mem_kb"))
+                                                val props = if (hasProps) com.example.engine.CircuitUtils.parseProps(firstLine) else emptyMap()
+                                                val cleanLines = if (hasProps) lines.drop(1) else lines
+                                                val scriptLines = cleanLines.filter { 
+                                                    val trimmed = it.trim()
+                                                    trimmed.isNotEmpty() && !trimmed.startsWith("--") && !trimmed.startsWith("//") 
+                                                }
+                                                
+                                                val mclCores = props["cores"]?.toIntOrNull() ?: 1
+                                                val mclMemKb = props["mem_kb"]?.toIntOrNull() ?: 1024
+                                                
+                                                totalAvailableRamKb += mclMemKb
+                                                totalRequiredRamKb += 128 + scriptLines.size * 32
+                                                totalRequiredCpuMhz += (10 + scriptLines.size * 10) * mclCores
+                                            }
+                                        }
+                                    }
+                                }
+
+                                val systemCpuBudgetMhz = allocatedCores * clockMhz
+                                val isCpuOverloaded = totalRequiredCpuMhz > systemCpuBudgetMhz
+                                val isOom = totalRequiredRamKb > totalAvailableRamKb
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    val mcuCount = grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                                    val activeCpuCores = if (isSimulationRunning) (1 + mcuCount) else 1
-                                    Text(text = if (lang == AppLanguage.RU) "Ядра процессора" else if (lang == AppLanguage.UK) "Ядра процесора" else "CPU Cores", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    Text(text = "$activeCpuCores Cores", fontSize = 10.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                                    Text(text = if (lang == AppLanguage.RU) "Активные МК" else if (lang == AppLanguage.UK) "Активні МК" else "Active MCUs", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    Text(text = "$activeMcusCount Multi-CPU", fontSize = 10.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
                                 }
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    val mcuCount = grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                                    val cpuFrequencyMhz = if (isSimulationRunning) {
-                                        val baseFreq = 80.0f + (mcuCount * 40.0f)
-                                        val drift = ((System.currentTimeMillis() % 500) - 250) / 1000f
-                                        baseFreq + drift
-                                    } else {
-                                        0.0f
-                                    }
-                                    Text(text = if (lang == AppLanguage.RU) "Частота ЦП" else if (lang == AppLanguage.UK) "Частота процесора" else "CPU Clock", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    Text(text = if (cpuFrequencyMhz > 0f) String.format(Locale.US, "%.2f MHz", cpuFrequencyMhz) else "0.00 MHz", fontSize = 10.sp, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
+                                    Text(text = if (lang == AppLanguage.RU) "Нагрузка ЦП" else if (lang == AppLanguage.UK) "Навантаження ЦП" else "CPU Load", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    val cpuColor = if (isCpuOverloaded) Color(0xFFFF5555) else Color(0xFF00FF00)
+                                    val loadText = if (systemCpuBudgetMhz > 0) "${(totalRequiredCpuMhz * 100 / systemCpuBudgetMhz).coerceAtMost(500)}%" else "0%"
+                                    Text(text = "$totalRequiredCpuMhz/$systemCpuBudgetMhz MHz ($loadText)", fontSize = 10.sp, color = cpuColor, fontWeight = FontWeight.Bold)
                                 }
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    val mcuCount = grid.sumOf { col -> col.count { it.type == ComponentType.MICROCONTROLLER } }
-                                    val ramUsageMb = if (isSimulationRunning) {
-                                        15.4f + (mcuCount * 4.2f)
-                                    } else {
-                                        3.8f
+                                    Text(text = if (lang == AppLanguage.RU) "Нагрузка ОЗУ" else if (lang == AppLanguage.UK) "Навантаження ОЗУ" else "RAM Load", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    val ramColor = if (isOom) Color(0xFFFF5555) else Color(0xFF00FFCC)
+                                    Text(text = "$totalRequiredRamKb/$totalAvailableRamKb KB", fontSize = 10.sp, color = ramColor, fontWeight = FontWeight.Bold)
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    var maxTemp = 25f
+                                    for (col in grid) {
+                                        for (comp in col) {
+                                            if (comp.type == ComponentType.MICROCONTROLLER && comp.temperature > maxTemp) {
+                                                maxTemp = comp.temperature
+                                            }
+                                        }
                                     }
-                                    Text(text = if (lang == AppLanguage.RU) "Память ОЗУ" else if (lang == AppLanguage.UK) "Пам'ять ОЗУ" else "Sim RAM", fontSize = 10.sp, color = Color(0xFFAAAAAA))
-                                    Text(text = String.format(Locale.US, "%.1f MB", ramUsageMb), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text(text = if (lang == AppLanguage.RU) "Макс температура" else if (lang == AppLanguage.UK) "Макс температура" else "Max Temp", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                    val tempColor = if (maxTemp > 1000f) Color(0xFFFF3333) else if (maxTemp > 150f) Color(0xFFFF9900) else Color(0xFF00FF00)
+                                    Text(text = "${maxTemp.toInt()}°C", fontSize = 10.sp, color = tempColor, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                             "PHONE" -> {
@@ -545,8 +632,8 @@ object UIEngine {
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 12.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            .padding(horizontal = 8.dp, vertical = 1.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         activeMasterTabState.categories.forEach { category ->
@@ -557,20 +644,20 @@ object UIEngine {
                                 modifier = Modifier
                                     .background(
                                         color = if (isSelected) Color(0xFF264F4A) else Color(0xFF20202E),
-                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
                                     )
                                     .border(
                                         width = 1.dp,
                                         color = if (isSelected) Color(0xFF00FFCC) else Color(0x22FFFFFF),
-                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
                                     )
                                     .clickable { onCategorySelected(category) }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
                                 contentAlignment = Alignment.Center
                               ) {
                                   Text(
                                       text = categoryName,
-                                      fontSize = 11.sp,
+                                      fontSize = 10.sp,
                                       fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                       color = if (isSelected) Color(0xFF00FFCC) else Color(0xFFCCCCCC)
                                   )
@@ -578,39 +665,40 @@ object UIEngine {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                    // Premium Intelligent Real-time Multilingual Search Bar
+                    // Premium Intelligent Real-time Multilingual Search Bar (More compact)
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                            .padding(horizontal = 8.dp, vertical = 1.dp),
                         placeholder = {
                             Text(
-                                text = if (lang == AppLanguage.RU) "Поиск среди 220+ элементов..."
-                                       else if (lang == AppLanguage.UK) "Пошук серед 220+ елементів..."
-                                       else "Search 220+ elements...",
-                                fontSize = 12.sp,
+                                text = if (lang == AppLanguage.RU) "Поиск предметов..."
+                                       else if (lang == AppLanguage.UK) "Пошук предметів..."
+                                       else "Search elements...",
+                                fontSize = 11.sp,
                                 color = Color.Gray
                             )
                         },
+                        textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
                         leadingIcon = {
-                            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color(0xFF00FFCC))
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color(0xFF00FFCC), modifier = Modifier.size(16.dp))
                         },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
                                 IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color.LightGray)
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color.LightGray, modifier = Modifier.size(16.dp))
                                 }
                             }
                         },
                         singleLine = true,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     // Display filtered component list inside clean responsive grid
                     val componentsToShow = remember(selectedCategory, searchQuery) {
@@ -636,13 +724,13 @@ object UIEngine {
                     }
 
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 72.dp),
+                        columns = GridCells.Adaptive(minSize = 62.dp),
                         modifier = Modifier
-                            .height(180.dp)
-                            .padding(horizontal = 8.dp),
-                        contentPadding = PaddingValues(bottom = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .height(115.dp)
+                            .padding(horizontal = 4.dp),
+                        contentPadding = PaddingValues(bottom = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         items(componentsToShow) { type ->
                             ToolButton(

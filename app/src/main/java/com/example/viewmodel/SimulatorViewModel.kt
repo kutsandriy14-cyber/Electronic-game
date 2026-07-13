@@ -44,7 +44,10 @@ data class SimulatorState(
     val allocatedRamGbytes: Int = 4, // Simulated RAM limit (1 to 16 GB)
     val allocatedCores: Int = 4,      // Simulated CPU Core count (1 to 8)
     val clockMhz: Int = 2400,         // Simulated CPU Clock Speed throttling (500 to 3600 MHz)
-    val canvasStyle: String = "dark_neon" // Canvas aesthetic theme: "dark_neon", "blueprint", "oled_black"
+    val canvasStyle: String = "dark_neon", // Canvas aesthetic theme: "dark_neon", "blueprint", "oled_black"
+    val brushSize: Int = 1, // Brush size to draw with (1x1, 3x3, 5x5, etc.)
+    val alertMessage: String? = null,
+    val cloudSchemes: List<String> = emptyList()
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -71,6 +74,7 @@ data class SimulatorState(
         if (allocatedCores != other.allocatedCores) return false
         if (clockMhz != other.clockMhz) return false
         if (canvasStyle != other.canvasStyle) return false
+        if (brushSize != other.brushSize) return false
         
         // Deep equals last because it is very expensive
         if (!grid.contentDeepEquals(other.grid)) return false
@@ -99,6 +103,7 @@ data class SimulatorState(
         result = 31 * result + allocatedCores
         result = 31 * result + clockMhz
         result = 31 * result + canvasStyle.hashCode()
+        result = 31 * result + brushSize
         return result
     }
 }
@@ -202,7 +207,8 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
                             state.height, 
                             currentTick,
                             ramGb = state.allocatedRamGbytes,
-                            cores = state.allocatedCores
+                            cores = state.allocatedCores,
+                            clockMhz = state.clockMhz
                         )
                         currentGrid = simResult.grid.map { col -> col.clone() }.toTypedArray()
                         currentTelemetry = simResult.telemetry
@@ -309,105 +315,112 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
 
         _uiState.update { current ->
             val gridCopy = current.grid.map { it.clone() }.toTypedArray()
-            val cell = gridCopy[x][y]
 
-            if (tool == ComponentType.EMPTY) {
-                if (cell.type == ComponentType.DOUBLE_DOOR) {
-                    val dir = cell.direction
-                    val nx = x + Physical.getDx(dir)
-                    val ny = y + Physical.getDy(dir)
-                    if (nx in 0 until actualWidth && ny in 0 until actualHeight && gridCopy[nx][ny].type == ComponentType.DOUBLE_DOOR) {
-                        gridCopy[nx][ny] = GridComponent()
-                    }
-                }
-                gridCopy[x][y] = GridComponent()
-            } else if (tool == ComponentType.ROTATE) {
-                if (Physical.canRotate(cell.type)) {
-                    gridCopy[x][y] = Physical.rotate(cell)
-                }
-            } else if (tool == ComponentType.SWITCH_OPEN || tool == ComponentType.SWITCH_CLOSED) {
-                val currentType = cell.type
-                if (currentType == ComponentType.SWITCH_OPEN) {
-                    gridCopy[x][y] = cell.copy(type = ComponentType.SWITCH_CLOSED)
-                } else if (currentType == ComponentType.SWITCH_CLOSED) {
-                    gridCopy[x][y] = cell.copy(type = ComponentType.SWITCH_OPEN)
-                } else {
-                    gridCopy[x][y] = GridComponent(tool)
-                }
-            } else if (tool == ComponentType.PUSH_BUTTON) {
-                val currentType = cell.type
-                if (currentType == ComponentType.PUSH_BUTTON) {
-                    gridCopy[x][y] = cell.copy(logicState = !cell.logicState)
-                } else {
-                    gridCopy[x][y] = GridComponent(tool)
-                }
-            } else if (current.selectedTool == ComponentType.WIRE_ANY && 
-                       (cell.type == ComponentType.SWITCH_OPEN || cell.type == ComponentType.SWITCH_CLOSED)) {
-                val currentType = cell.type
-                gridCopy[x][y] = cell.copy(type = if(currentType == ComponentType.SWITCH_OPEN) ComponentType.SWITCH_CLOSED else ComponentType.SWITCH_OPEN)
-            } else {
-                // Feature: "зделай нормальние компаненти штоби их можно било поварачувать"
-                // If they click with a tool on a component of the exact SAME type, we ROTATE it!
-                if (cell.type == tool && Physical.canRotate(tool)) {
-                    val rotatedCell = Physical.rotate(cell)
-                    gridCopy[x][y] = rotatedCell
-                    if (tool == ComponentType.DOUBLE_DOOR) {
-                        val oldDir = cell.direction
-                        val oldNx = x + Physical.getDx(oldDir)
-                        val oldNy = y + Physical.getDy(oldDir)
-                        if (oldNx in 0 until actualWidth && oldNy in 0 until actualHeight && gridCopy[oldNx][oldNy].type == ComponentType.DOUBLE_DOOR) {
-                            gridCopy[oldNx][oldNy] = GridComponent()
-                        }
-                        val newDir = rotatedCell.direction
-                        val newNx = x + Physical.getDx(newDir)
-                        val newNy = y + Physical.getDy(newDir)
-                        if (newNx in 0 until actualWidth && newNy in 0 until actualHeight) {
-                            val oppDir = when (newDir) {
-                                Direction.UP -> Direction.DOWN
-                                Direction.DOWN -> Direction.UP
-                                Direction.LEFT -> Direction.RIGHT
-                                Direction.RIGHT -> Direction.LEFT
+            val isSingleOnly = tool == ComponentType.ROTATE || tool == ComponentType.PUSH_BUTTON || tool == ComponentType.INSPECT || tool == ComponentType.MULTIMETER
+            val bRange = if (isSingleOnly) 0 else (current.brushSize / 2)
+
+            for (dx in -bRange..bRange) {
+                for (dy in -bRange..bRange) {
+                    val cx = x + dx
+                    val cy = y + dy
+                    if (cx in 0 until actualWidth && cy in 0 until actualHeight) {
+                        val cell = gridCopy[cx][cy]
+
+                        if (tool == ComponentType.EMPTY) {
+                            if (cell.type == ComponentType.DOUBLE_DOOR) {
+                                val dir = cell.direction
+                                val nx = cx + Physical.getDx(dir)
+                                val ny = cy + Physical.getDy(dir)
+                                if (nx in 0 until actualWidth && ny in 0 until actualHeight && gridCopy[nx][ny].type == ComponentType.DOUBLE_DOOR) {
+                                    gridCopy[nx][ny] = GridComponent()
+                                }
                             }
-                            gridCopy[newNx][newNy] = GridComponent(type = ComponentType.DOUBLE_DOOR, direction = oppDir)
-                        }
-                    }
-                } else {
-                    gridCopy[x][y] = GridComponent(tool)
-                    if (tool == ComponentType.DOUBLE_DOOR) {
-                        val dir = gridCopy[x][y].direction
-                        val dx = Physical.getDx(dir)
-                        val dy = Physical.getDy(dir)
-                        val nx = x + dx
-                        val ny = y + dy
-                        if (nx in 0 until actualWidth && ny in 0 until actualHeight) {
-                            val oppDir = when (dir) {
-                                Direction.UP -> Direction.DOWN
-                                Direction.DOWN -> Direction.UP
-                                Direction.LEFT -> Direction.RIGHT
-                                Direction.RIGHT -> Direction.LEFT
+                            gridCopy[cx][cy] = GridComponent()
+                        } else if (tool == ComponentType.ROTATE) {
+                            if (Physical.canRotate(cell.type)) {
+                                gridCopy[cx][cy] = Physical.rotate(cell)
                             }
-                            gridCopy[nx][ny] = GridComponent(type = ComponentType.DOUBLE_DOOR, direction = oppDir)
+                        } else if (tool == ComponentType.SWITCH_OPEN || tool == ComponentType.SWITCH_CLOSED) {
+                            val currentType = cell.type
+                            if (currentType == ComponentType.SWITCH_OPEN) {
+                                gridCopy[cx][cy] = cell.copy(type = ComponentType.SWITCH_CLOSED)
+                            } else if (currentType == ComponentType.SWITCH_CLOSED) {
+                                gridCopy[cx][cy] = cell.copy(type = ComponentType.SWITCH_OPEN)
+                            } else {
+                                gridCopy[cx][cy] = GridComponent(tool)
+                            }
+                        } else if (tool == ComponentType.PUSH_BUTTON) {
+                            val currentType = cell.type
+                            if (currentType == ComponentType.PUSH_BUTTON) {
+                                gridCopy[cx][cy] = cell.copy(logicState = !cell.logicState)
+                            } else {
+                                gridCopy[cx][cy] = GridComponent(tool)
+                            }
+                        } else if (current.selectedTool == ComponentType.WIRE_ANY && 
+                                   (cell.type == ComponentType.SWITCH_OPEN || cell.type == ComponentType.SWITCH_CLOSED)) {
+                            val currentType = cell.type
+                            gridCopy[cx][cy] = cell.copy(type = if(currentType == ComponentType.SWITCH_OPEN) ComponentType.SWITCH_CLOSED else ComponentType.SWITCH_OPEN)
+                        } else {
+                            if (cell.type == tool && Physical.canRotate(tool)) {
+                                val rotatedCell = Physical.rotate(cell)
+                                gridCopy[cx][cy] = rotatedCell
+                                if (tool == ComponentType.DOUBLE_DOOR) {
+                                    val oldDir = cell.direction
+                                    val oldNx = cx + Physical.getDx(oldDir)
+                                    val oldNy = cy + Physical.getDy(oldDir)
+                                    if (oldNx in 0 until actualWidth && oldNy in 0 until actualHeight && gridCopy[oldNx][oldNy].type == ComponentType.DOUBLE_DOOR) {
+                                        gridCopy[oldNx][oldNy] = GridComponent()
+                                    }
+                                    val newDir = rotatedCell.direction
+                                    val newNx = cx + Physical.getDx(newDir)
+                                    val newNy = cy + Physical.getDy(newDir)
+                                    if (newNx in 0 until actualWidth && newNy in 0 until actualHeight) {
+                                        val oppDir = when (newDir) {
+                                            Direction.UP -> Direction.DOWN
+                                            Direction.DOWN -> Direction.UP
+                                            Direction.LEFT -> Direction.RIGHT
+                                            Direction.RIGHT -> Direction.LEFT
+                                        }
+                                        gridCopy[newNx][newNy] = GridComponent(type = ComponentType.DOUBLE_DOOR, direction = oppDir)
+                                    }
+                                }
+                            } else {
+                                gridCopy[cx][cy] = GridComponent(tool)
+                                if (tool == ComponentType.DOUBLE_DOOR) {
+                                    val dir = gridCopy[cx][cy].direction
+                                    val tDx = Physical.getDx(dir)
+                                    val tDy = Physical.getDy(dir)
+                                    val nx = cx + tDx
+                                    val ny = cy + tDy
+                                    if (nx in 0 until actualWidth && ny in 0 until actualHeight) {
+                                        val oppDir = when (dir) {
+                                            Direction.UP -> Direction.DOWN
+                                            Direction.DOWN -> Direction.UP
+                                            Direction.LEFT -> Direction.RIGHT
+                                            Direction.RIGHT -> Direction.LEFT
+                                        }
+                                        gridCopy[nx][ny] = GridComponent(type = ComponentType.DOUBLE_DOOR, direction = oppDir)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
 
             val updatedState = if (!current.isSimulationRunning) {
-                val simResult = engine.calculatePower(gridCopy, current.width, current.height, current.simulationTick)
+                val simResult = engine.calculatePower(
+                    gridCopy, 
+                    current.width, 
+                    current.height, 
+                    current.simulationTick,
+                    ramGb = current.allocatedRamGbytes,
+                    cores = current.allocatedCores,
+                    clockMhz = current.clockMhz
+                )
                 current.copy(grid = simResult.grid, telemetry = simResult.telemetry)
             } else {
                 current.copy(grid = gridCopy)
-            }
-            
-            // Feature: Easter egg check for batteries outside the update lambda's heavy operations, but we can do it effectively here
-            // However, counting all elements is better done outside the update lambda. Wait, the prompt says inside the lambda is bad.
-            // I'll calculate it before `val updatedState` or update is EasterEggActive directly.
-            // Oh, I will just compute it inside. Wait, `sumOf` is better.
-            if (tool == ComponentType.BATTERY) {
-                 val batteryCount = gridCopy.sumOf { col -> col.count { it.type == ComponentType.BATTERY } }
-                 if (batteryCount > 8) {
-                      return@update updatedState.copy(isEasterEggActive = true)
-                 }
             }
             
             updatedState
@@ -428,7 +441,15 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
             gridCopy[x][y] = newComp
             
             val updatedState = if (!current.isSimulationRunning) {
-                val simResult = engine.calculatePower(gridCopy, current.width, current.height, current.simulationTick)
+                val simResult = engine.calculatePower(
+                    gridCopy, 
+                    current.width, 
+                    current.height, 
+                    current.simulationTick,
+                    ramGb = current.allocatedRamGbytes,
+                    cores = current.allocatedCores,
+                    clockMhz = current.clockMhz
+                )
                 current.copy(grid = simResult.grid, telemetry = simResult.telemetry, inspectCoordinates = null)
             } else {
                 current.copy(grid = gridCopy, inspectCoordinates = null)
@@ -460,7 +481,19 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
     }
 
     fun showSaveDialog() { _uiState.update { it.copy(showSaveDialog = true) } }
-    fun showLoadDialog() { _uiState.update { it.copy(showLoadDialog = true) } }
+    fun showLoadDialog() { 
+        _uiState.update { it.copy(showLoadDialog = true) }
+        if (!com.example.netauth.NetAuthManager.isGuest) {
+            viewModelScope.launch {
+                val listResult = com.example.netauth.NetAuthManager.listFiles()
+                if (listResult.isSuccess) {
+                    _uiState.update { it.copy(cloudSchemes = listResult.getOrNull() ?: emptyList()) }
+                }
+            }
+        } else {
+            _uiState.update { it.copy(cloudSchemes = emptyList()) }
+        }
+    }
     fun showSettingsDialog() { _uiState.update { it.copy(showSettingsDialog = true) } }
 
     fun updateHardwareSettings(ramGb: Int, cores: Int, mhz: Int, canvasStyle: String) {
@@ -478,14 +511,47 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
         _uiState.update { it.copy(showSettingsDialog = false) }
     }
 
+    fun dismissAlert() {
+        _uiState.update { it.copy(alertMessage = null) }
+    }
+
     fun dismissDialogs() {
         _uiState.update { it.copy(showLoadDialog = false, showSaveDialog = false, showSettingsDialog = false) }
     }
 
     fun saveScheme(name: String) {
         val currentState = _uiState.value
+        
+        var isEmpty = true
+        for (col in currentState.grid) {
+            for (comp in col) {
+                if (comp.type != ComponentType.EMPTY) {
+                    isEmpty = false
+                    break
+                }
+            }
+        }
+        
+        if (isEmpty && !com.example.netauth.NetAuthManager.isGuest) {
+            _uiState.update { it.copy(alertMessage = "Нельзя загрузить пустую схему") }
+            return
+        }
+
         val gridData = engine.serializeGrid(currentState.grid, currentState.width, currentState.height)
         viewModelScope.launch {
+            if (!com.example.netauth.NetAuthManager.isGuest) {
+                val uploadResult = com.example.netauth.NetAuthManager.uploadFile("$name.json", gridData.toByteArray())
+                if (uploadResult.isFailure) {
+                    val ex = uploadResult.exceptionOrNull()
+                    if (ex?.message == "413_PAYLOAD_TOO_LARGE") {
+                        _uiState.update { it.copy(alertMessage = "Недостаточно места в облаке NetAuth (Лимит 512 МБ)") }
+                        return@launch
+                    } else {
+                        _uiState.update { it.copy(alertMessage = "Связь с NetAuth потеряна. Сохраняем локально.") }
+                    }
+                }
+            }
+            
             repository.insert(CircuitScheme(
                 name = name, 
                 gridData = gridData,
@@ -499,7 +565,15 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
     fun loadScheme(scheme: CircuitScheme) {
         val newGrid = engine.deserializeGrid(scheme.gridData, scheme.width, scheme.height)
         viewModelScope.launch(Dispatchers.Default) {
-             val simResult = engine.calculatePower(newGrid, scheme.width, scheme.height)
+             val currentHardware = _uiState.value
+             val simResult = engine.calculatePower(
+                 newGrid, 
+                 scheme.width, 
+                 scheme.height,
+                 ramGb = currentHardware.allocatedRamGbytes,
+                 cores = currentHardware.allocatedCores,
+                 clockMhz = currentHardware.clockMhz
+             )
             _uiState.update { 
                 it.copy(
                     grid = simResult.grid, 
@@ -512,11 +586,32 @@ class SimulatorViewModel(private val repository: CircuitRepository) : ViewModel(
         }
     }
     
+    fun loadCloudScheme(fileName: String) {
+        viewModelScope.launch {
+            val downloadResult = com.example.netauth.NetAuthManager.downloadFile(fileName)
+            if (downloadResult.isSuccess) {
+                val gridData = String(downloadResult.getOrNull()!!)
+                // we assume cloud saves preserve the size, or we can guess/detect it. 
+                // Wait, CircuitEngine.deserializeGrid usually takes width/height. We might need to parse or use current.
+                // Let's use 16x16 as fallback or what if gridData has no dimensions?
+                // Actually `importShareableString` does `deserializeGrid(actualData, _uiState.value.width, _uiState.value.height)`
+                importShareableString(gridData)
+                dismissDialogs()
+            } else {
+                _uiState.update { it.copy(alertMessage = "Ошибка при загрузке облачной схемы. Связь с NetAuth потеряна") }
+            }
+        }
+    }
+    
     fun deleteScheme(id: Int) {
         viewModelScope.launch { repository.deleteById(id) }
     }
 
     fun setTimeMultiplier(multiplier: Int) {
         _uiState.update { it.copy(timeMultiplier = multiplier.coerceIn(1, 20)) }
+    }
+
+    fun setBrushSize(size: Int) {
+        _uiState.update { it.copy(brushSize = size.coerceIn(1, 9)) }
     }
 }

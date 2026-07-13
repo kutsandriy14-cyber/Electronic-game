@@ -12,6 +12,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.border
 import androidx.compose.ui.window.Dialog
 import com.example.lang.AppLanguage
 import com.example.lang.Lang
@@ -23,7 +25,8 @@ import com.example.functional.Battery
 @Composable
 fun InspectDialog(
     lang: AppLanguage,
-    component: GridComponent, 
+    component: GridComponent,
+    grid: Array<Array<GridComponent>>,
     onDismiss: () -> Unit, 
     onSave: (String, Boolean) -> Unit
 ) {
@@ -103,9 +106,142 @@ fun InspectDialog(
                     OutlinedTextField(
                         value = textData,
                         onValueChange = { textData = it },
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        modifier = Modifier.weight(0.4f).fillMaxWidth(),
                         placeholder = { Text("e.g. display=Hello") }
                     )
+
+                    // Breathtaking retro linked CPU/Microcontroller terminal view
+                    val mcu = grid.flatMap { it.toList() }.find { it.type == ComponentType.MICROCONTROLLER }
+                    if (mcu != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = if (lang == AppLanguage.RU) "🖥️ Подключение к процессору: АКТИВНО" else "🖥️ Connection to CPU: ACTIVE",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = Color(0xFF00FFCC),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(0.6f)
+                                .background(Color(0xFF0B0C10), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                                .border(1.5.dp, Color(0xFF00FFCC), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                                .padding(8.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    text = "--- PROCESSOR PROGRAM TERMINAL ---",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    color = Color(0xAA00FFCC),
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                val lines = mcu.extraData.split('\n').filter { it.trim().isNotEmpty() }
+                                if (lines.isEmpty()) {
+                                    Text(
+                                        text = "> NO ACTIVE PROGRAM CODE FOUND.\n> Edit the MCU on the board to write code.",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                        color = Color.LightGray
+                                    )
+                                } else {
+                                    lines.take(8).forEach { line ->
+                                        Text(
+                                            text = ">> $line",
+                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                            color = Color(0xFF66FF99)
+                                        )
+                                    }
+                                    if (lines.size > 8) {
+                                        Text(
+                                            text = "... (${lines.size - 8} more lines)",
+                                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                            color = Color.Gray
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = if (lang == AppLanguage.RU) "⚠️ Процессор не обнаружен на плате" else "⚠️ Processor not found on board",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFFF5555),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (lang == AppLanguage.RU) "Разместите МК программируемый на сетке, чтобы связать его с этим экраном." else "Place an MCU programmer on the grid to link its output with this screen.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
+                    }
+                } else if (component.type == ComponentType.NUCLEAR_REACTOR) {
+                    Text(
+                        text = if (lang == AppLanguage.RU) "⚛️ СИСТЕМА УПРАВЛЕНИЯ РЕАКТОРОМ" else "⚛️ NUCLEAR CONTROL PANEL",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color(0xFFFF9800),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    val parsedProps = remember(textData) { com.example.engine.CircuitUtils.parseProps(textData) }
+                    var rodsDepth by remember { mutableStateOf(parsedProps["rods"]?.toFloatOrNull() ?: 80f) }
+                    
+                    Text(
+                        text = if (lang == AppLanguage.RU) 
+                            "Глубина погружения стержней: ${rodsDepth.toInt()}%" 
+                            else "Control Rod Position: ${rodsDepth.toInt()}%",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    Slider(
+                        value = rodsDepth,
+                        onValueChange = {
+                            rodsDepth = it
+                            val newProps = parsedProps.toMutableMap()
+                            newProps["rods"] = it.toInt().toString()
+                            textData = newProps.map { (k, v) -> "$k=$v" }.joinToString("|")
+                        },
+                        valueRange = 0f..100f,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color(0xFFFF9800),
+                            activeTrackColor = Color(0xFFFFB74D),
+                            inactiveTrackColor = Color.DarkGray
+                        )
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Display nuclear statistics
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .background(Color(0xFF1E1E1E), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            .border(1.dp, Color(0xFFFF9800), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            .padding(12.dp)
+                    ) {
+                        Column {
+                            val voltageOutput = (parsedProps["v"]?.toFloatOrNull() ?: 240f) * (rodsDepth / 100f)
+                            val estimatedPower = (voltageOutput * (component.current / 1000f)).coerceAtLeast(0f)
+                            
+                            Text(
+                                "REACTOR CORE TELEMETRY", 
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                color = Color.Gray,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("Power output:", style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace), color = Color.LightGray)
+                                Text("${String.format(java.util.Locale.US, "%.1f", estimatedPower)} W", style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold), color = Color(0xFF00FFCC))
+                            }
+                        }
+                    }
                 } else {
                     Text(Lang.t("edit_properties", lang), style = MaterialTheme.typography.labelMedium)
                     Spacer(modifier = Modifier.height(4.dp))

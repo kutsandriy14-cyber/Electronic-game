@@ -28,6 +28,11 @@ import androidx.compose.ui.unit.sp
 import com.example.lang.AppLanguage
 import com.example.lang.Lang
 import com.example.viewmodel.SimulatorViewModel
+import com.example.engine.JavaModManager
+import com.example.engine.JavaModEngine
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.ContentCopy
+import java.io.File
 
 @Composable
 fun SettingsDialog(
@@ -128,7 +133,12 @@ fun SettingsDialog(
                     Tab(
                         selected = selectedTab == 2,
                         onClick = { selectedTab = 2 },
-                        text = { Text(if (lang == AppLanguage.RU) "Эмуляция Железа" else if (lang == AppLanguage.UK) "Залізо" else "Hardware Limits", style = MaterialTheme.typography.labelLarge) }
+                        text = { Text(if (lang == AppLanguage.RU) "Железо" else if (lang == AppLanguage.UK) "Залізо" else "Hardware", style = MaterialTheme.typography.labelLarge) }
+                    )
+                    Tab(
+                        selected = selectedTab == 3,
+                        onClick = { selectedTab = 3 },
+                        text = { Text(if (lang == AppLanguage.RU) "Java Моды" else if (lang == AppLanguage.UK) "Java Моди" else "Java Mods", style = MaterialTheme.typography.labelLarge) }
                     )
                 }
 
@@ -492,6 +502,9 @@ fun SettingsDialog(
                                 }
                             }
                         }
+                        3 -> {
+                            JavaModdingTab(lang)
+                        }
                     }
                 }
             }
@@ -509,4 +522,259 @@ fun SettingsDialog(
             } 
         }
     )
+}
+
+@Composable
+fun JavaModdingTab(lang: AppLanguage) {
+    val context = LocalContext.current
+    var scriptCode by remember { mutableStateOf(JavaModEngine.getCurrentModScript()) }
+    var activeModName by remember { mutableStateOf(JavaModEngine.getActiveModName()) }
+    var errorStatus by remember { mutableStateOf(JavaModEngine.getLastParsingErrors()) }
+    
+    var benchmarkResult by remember { mutableStateOf("") }
+    var isBenchmarking by remember { mutableStateOf(false) }
+    
+    val logs = remember { mutableStateListOf<String>().apply { 
+        add("[Java Core Compiler] Ready to interpret ESMS code.")
+        add("[Java Core Compiler] Current active mod: " + JavaModEngine.getActiveModName())
+    } }
+
+    val applyScript = {
+        JavaModEngine.setCurrentModScript(scriptCode)
+        val success = JavaModEngine.compileAndApplyModScript(scriptCode)
+        activeModName = JavaModEngine.getActiveModName()
+        errorStatus = JavaModEngine.getLastParsingErrors()
+        
+        logs.add("[JVM Compile] Tick: " + System.currentTimeMillis() % 1000)
+        if (success) {
+            logs.add("[SUCCESS] Applied Mod \"" + activeModName + "\" successfully!")
+            logs.add("  - Water color: " + JavaModEngine.waterColorHex)
+            logs.add("  - Vortex state: " + (if (JavaModEngine.vortexActive) "ACTIVE" else "INACTIVE") + " at (" + JavaModEngine.vortexCenterX + ", " + JavaModEngine.vortexCenterY + ")")
+        } else {
+            logs.add("[ERROR] " + errorStatus)
+        }
+        Unit
+    }
+
+    Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+        Text(
+            text = if (lang == AppLanguage.RU) "Редактор ESMS Модов (Ядро Java)" else if (lang == AppLanguage.UK) "Редактор ESMS Модів (Ядро Java)" else "Java ESMS Code Compiler",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        Text(
+            text = if (lang == AppLanguage.RU) 
+                "Напишите код мода на новом синтаксисе ESMS. Модификации выполняются на лету прямо на виртуальной машине Java."
+                else
+                "Write custom mods in ESM Script syntax. Code updates execute instantly inside the high-octane Java Host Virtual Engine.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        // Custom script input area (Monospace, dark theme)
+        OutlinedTextField(
+            value = scriptCode,
+            onValueChange = { scriptCode = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
+                .background(Color(0xFF0F1E1A), RoundedCornerShape(8.dp)),
+            textStyle = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                color = Color(0xFF00FF99),
+                fontSize = 11.sp
+            ),
+            label = { Text("ESMS Script Source Code", fontSize = 10.sp) },
+            shape = RoundedCornerShape(8.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = Color(0xFF334433)
+            )
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        // Actions Row: Compile, Export, Import
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Button(
+                onClick = applyScript,
+                modifier = Modifier.weight(1.2f),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(if (lang == AppLanguage.RU) "Запустить" else "Compile", fontSize = 11.sp, maxLines = 1)
+            }
+
+            Button(
+                onClick = {
+                    val esmFile = JavaModEngine.packAndSaveEsm(context, activeModName)
+                    if (esmFile != null) {
+                        logs.add("[EXPORT] Saved mod archives renamed as: " + esmFile.name)
+                        logs.add("  - Path: " + esmFile.absolutePath)
+                    } else {
+                        logs.add("[EXPORT ERROR] Failed to compress script ZIP container as .esm")
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+            ) {
+                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(if (lang == AppLanguage.RU) "В .esm (ZIP)" else "Export .esm", fontSize = 10.sp, maxLines = 1)
+            }
+
+            Button(
+                onClick = {
+                    // Try to load any existing .esm file in directory or default
+                    val dir = context.getExternalFilesDir("mods") ?: context.cacheDir
+                    val files = dir.listFiles { _, name -> name.endsWith(".esm") }
+                    if (files != null && files.isNotEmpty()) {
+                        val target = files[0]
+                        val success = JavaModEngine.unpackAndLoadEsm(context, target)
+                        if (success) {
+                            scriptCode = JavaModEngine.getCurrentModScript()
+                            activeModName = JavaModEngine.getActiveModName()
+                            errorStatus = JavaModEngine.getLastParsingErrors()
+                            logs.add("[IMPORT] Successfully decompressed and loaded " + target.name)
+                        } else {
+                            logs.add("[IMPORT ERROR] Failed to parse mod.esms script inside " + target.name)
+                        }
+                    } else {
+                        logs.add("[IMPORT] No .esm files found. Export a mod first!")
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+            ) {
+                Text(if (lang == AppLanguage.RU) "Загрузить .esm" else "Import .esm", fontSize = 10.sp, maxLines = 1)
+            }
+        }
+
+        // Live Diagnostic Metrics compiled from active ESM variables
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+        ) {
+            Column(modifier = Modifier.padding(10.dp)) {
+                Text(
+                    text = "Engine State - Compiled Parameters",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Active Mod: $activeModName", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Text("Water Custom Color: ${JavaModEngine.waterColorHex}", fontSize = 10.sp)
+                        Text("Brick Custom Color: ${JavaModEngine.brickColorHex}", fontSize = 10.sp)
+                    }
+                    Column {
+                        Text("Vortex Whirlpool: " + (if (JavaModEngine.vortexActive) "ENABLED" else "DISABLED"), fontSize = 10.sp)
+                        Text("Vortex Center: (${JavaModEngine.vortexCenterX}, ${JavaModEngine.vortexCenterY})", fontSize = 10.sp)
+                        Text("Vortex Range/Force: ${JavaModEngine.vortexRadius} / ${JavaModEngine.vortexStrength}", fontSize = 10.sp)
+                    }
+                }
+            }
+        }
+
+        // JVM Benchmark Actions Row
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = {
+                    isBenchmarking = true
+                    val timeMs = JavaModManager.runModSystemBenchmark()
+                    benchmarkResult = if (lang == AppLanguage.RU) "JVM: 100k ур. рещено за %.3f мс".format(timeMs) else "JVM: 100k eq. solved in %.3f ms".format(timeMs)
+                    isBenchmarking = false
+                    logs.add("[BENCHMARK] Sin/Cos 100,000 iterations ran in " + String.format("%.3f", timeMs) + " ms")
+                },
+                modifier = Modifier.weight(1.2f),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(if (isBenchmarking) "..." else if (lang == AppLanguage.RU) "Тест скорости Java" else "Hardware Benchmarks", fontSize = 11.sp, maxLines = 1)
+            }
+
+            Button(
+                onClick = {
+                    logs.clear()
+                    logs.add("[Console Logs Cleared]")
+                },
+                modifier = Modifier.weight(0.8f),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.outlineVariant, contentColor = MaterialTheme.colorScheme.onSurface)
+            ) {
+                Text(if (lang == AppLanguage.RU) "Очистить" else "Clear Logs", fontSize = 11.sp, maxLines = 1)
+            }
+        }
+
+        if (benchmarkResult.isNotEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+            ) {
+                Text(
+                    text = benchmarkResult,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(10.dp).fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        // Java Micro-console Logger Window
+        Text(
+            text = if (lang == AppLanguage.RU) "Лог модов ядра (Java Console)" else "Java Compiler Engine Console Log",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF111111)),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(110.dp)
+                .border(1.dp, Color(0xFF333333), RoundedCornerShape(8.dp))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp)
+            ) {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    logs.forEach { logLine ->
+                        Text(
+                            text = logLine,
+                            color = when {
+                                logLine.contains("[ERROR]") -> Color(0xFFFF5555)
+                                logLine.contains("[SUCCESS]") -> Color(0xFF00FFCC)
+                                logLine.contains("[EXPORT]") || logLine.contains("[IMPORT]") -> Color(0xFFFF9900)
+                                else -> Color(0xFFCCCCCC)
+                            },
+                            fontSize = 10.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            modifier = Modifier.padding(bottom = 2.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

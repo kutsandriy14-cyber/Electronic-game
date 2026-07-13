@@ -14,8 +14,8 @@ android {
     applicationId = "com.aistudio.electrosim.abxyz"
     minSdk = 24
     targetSdk = 36
-    versionCode = 10424
-    versionName = "1.4.24"
+    versionCode = 10423
+    versionName = "1.4.23"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -87,7 +87,7 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
-  // implementation(libs.androidx.navigation.compose)
+  implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
   // implementation(libs.coil.compose)

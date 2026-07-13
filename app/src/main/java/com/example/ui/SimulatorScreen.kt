@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -162,9 +163,11 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
             lang = state.appLanguage,
             isSimulationRunning = state.isSimulationRunning,
             timeMultiplier = state.timeMultiplier,
+            brushSize = state.brushSize,
             onToggleSimulation = { viewModel.toggleSimulation() },
             onClearGrid = { viewModel.clearGrid() },
             onSetTimeMultiplier = { viewModel.setTimeMultiplier(it) },
+            onSetBrushSize = { viewModel.setBrushSize(it) },
             onShowWiki = { showWikiDialog = true },
             onShowSave = { viewModel.showSaveDialog() },
             onShowLoad = { viewModel.showLoadDialog() },
@@ -214,6 +217,9 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
             telemetryState = telemetryState,
             onTabChanged = { telemetryTab = it },
             onStateChanged = { telemetryState = it },
+            allocatedRamGbytes = state.allocatedRamGbytes,
+            allocatedCores = state.allocatedCores,
+            clockMhz = state.clockMhz,
             modifier = Modifier.align(Alignment.TopEnd)
         )
 
@@ -246,7 +252,32 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
         }
 
         if (state.showSaveDialog) SaveDialog(lang = state.appLanguage, onDismiss = { viewModel.dismissDialogs() }, onSave = { name -> viewModel.saveScheme(name) })
-        if (state.showLoadDialog) LoadDialog(lang = state.appLanguage, schemes = savedSchemes, onDismiss = { viewModel.dismissDialogs() }, onLoad = { scheme -> viewModel.loadScheme(scheme) }, onDelete = { id -> viewModel.deleteScheme(id) })
+        if (state.showLoadDialog) {
+            LoadDialog(
+                lang = state.appLanguage, 
+                schemes = savedSchemes, 
+                cloudSchemes = state.cloudSchemes,
+                onDismiss = { viewModel.dismissDialogs() }, 
+                onLoad = { scheme -> viewModel.loadScheme(scheme) }, 
+                onLoadCloud = { fileName -> viewModel.loadCloudScheme(fileName) },
+                onDelete = { id -> viewModel.deleteScheme(id) }
+            )
+        }
+        
+        val currentAlert = state.alertMessage
+        if (currentAlert != null) {
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissAlert() },
+                title = { Text("NetAuth") },
+                text = { Text(currentAlert) },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.dismissAlert() }) {
+                        Text("OK")
+                    }
+                }
+            )
+        }
+
         if (state.showSettingsDialog) SettingsDialog(
             lang = state.appLanguage,
             onChangeLang = { viewModel.changeLanguage(it) },
@@ -268,6 +299,7 @@ fun SimulatorScreen(viewModel: SimulatorViewModel) {
                 InspectDialog(
                     lang = state.appLanguage,
                     component = comp,
+                    grid = state.grid,
                     onDismiss = { viewModel.dismissInspect() },
                     onSave = { data, repair -> viewModel.updateComponentData(coords.first, coords.second, data, repair) }
                 )
@@ -355,25 +387,9 @@ fun MultimeterDialog(component: GridComponent, coords: Pair<Int, Int>, onDismiss
                     
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
-                            Text("Voltage Drop", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                            Text(String.format(java.util.Locale.US, "%.2f V", component.voltage), style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Current", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                            Text(if (component.current >= 1000f) String.format(java.util.Locale.US, "%.2f A", component.current / 1000f) else String.format(java.util.Locale.US, "%.1f mA", component.current), style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("Path Resistance", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                            Text(if (component.resistance >= 1000f) String.format(java.util.Locale.US, "%.1f kΩ", component.resistance / 1000f) else String.format(java.util.Locale.US, "%.1f Ω", component.resistance), style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column {
-                            Text("Power Consumption", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            Text("Power Consumption / Transmission", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                             val powerMw = component.voltage * component.current
-                            Text(if (powerMw >= 1000f) String.format(java.util.Locale.US, "%.2f W", powerMw / 1000f) else String.format(java.util.Locale.US, "%.1f mW", powerMw), style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                            Text(if (powerMw >= 1000f) String.format(java.util.Locale.US, "%.2f W", powerMw / 1000f) else String.format(java.util.Locale.US, "%.1f mW", powerMw), style = MaterialTheme.typography.bodyLarge, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -445,11 +461,9 @@ fun CircuitGridCanvas(
                     detectDragGestures(
                         onDragStart = { startOffset ->
                             val localPoint = (startOffset - pan) / scale
-                            val cellX = (localPoint.x / baseCellSize).toInt()
-                            val cellY = (localPoint.y / baseCellSize).toInt()
-                            if (cellX in 0 until width && cellY in 0 until height) {
-                                onCellClicked(cellX, cellY)
-                            }
+                            val cellX = kotlin.math.floor(localPoint.x / baseCellSize).toInt().coerceIn(0, width - 1)
+                            val cellY = kotlin.math.floor(localPoint.y / baseCellSize).toInt().coerceIn(0, height - 1)
+                            onCellClicked(cellX, cellY)
                             lastCellX = cellX
                             lastCellY = cellY
                             activeHoverCell = Pair(cellX, cellY)
@@ -466,8 +480,8 @@ fun CircuitGridCanvas(
                         },
                         onDrag = { change, _ ->
                             val localPoint = (change.position - pan) / scale
-                            val cellX = (localPoint.x / baseCellSize).toInt()
-                            val cellY = (localPoint.y / baseCellSize).toInt()
+                            val cellX = kotlin.math.floor(localPoint.x / baseCellSize).toInt().coerceIn(0, width - 1)
+                            val cellY = kotlin.math.floor(localPoint.y / baseCellSize).toInt().coerceIn(0, height - 1)
                             activeHoverCell = Pair(cellX, cellY)
                             
                             val previousX = lastCellX
@@ -499,9 +513,7 @@ fun CircuitGridCanvas(
                                     }
                                 }
                             } else {
-                                if (cellX in 0 until width && cellY in 0 until height) {
-                                    onCellClicked(cellX, cellY)
-                                }
+                                onCellClicked(cellX, cellY)
                             }
                             lastCellX = cellX
                             lastCellY = cellY
@@ -513,8 +525,8 @@ fun CircuitGridCanvas(
                 if (selectedTool != ComponentType.PAN) {
                     detectTapGestures { tapOffset ->
                         val localPoint = (tapOffset - pan) / scale
-                        val cellX = (localPoint.x / baseCellSize).toInt()
-                        val cellY = (localPoint.y / baseCellSize).toInt()
+                        val cellX = kotlin.math.floor(localPoint.x / baseCellSize).toInt()
+                        val cellY = kotlin.math.floor(localPoint.y / baseCellSize).toInt()
                         if (cellX in 0 until width && cellY in 0 until height) {
                             onCellClicked(cellX, cellY)
                         }
@@ -650,7 +662,7 @@ fun CircuitGridCanvas(
                                         if (comp.isPowered) Color(0xFFE040FB) else Color(0xFF7B1FA2)
                                     }
                                     cat.name == "MATERIALS" || cat.name == "HYDRAULICS" -> {
-                                        if (comp.type == ComponentType.WATER || comp.type == ComponentType.INFINITE_WATER) Color(0xFF03A9F4)
+                                        if (comp.type == ComponentType.WATER || comp.type == ComponentType.INFINITE_WATER) Color(android.graphics.Color.parseColor(com.example.engine.JavaModEngine.waterColorHex))
                                         else if (comp.type == ComponentType.LAVA || comp.type == ComponentType.INFINITE_LAVA) Color(0xFFF44336)
                                         else if (comp.type == ComponentType.OIL || comp.type == ComponentType.INFINITE_OIL) Color(0xFF212121)
                                         else if (comp.type == ComponentType.ACID || comp.type == ComponentType.INFINITE_ACID) Color(0xFF8BC34A)
@@ -688,8 +700,67 @@ fun CircuitGridCanvas(
                                 com.example.engine.TabletRender.drawComponent(this, grid, x, y, actualGridWidth, actualGridHeight, comp, baseCellSize)
                             }
                             drawContext.canvas.restore()
+                        } else {
+                            val first = (x / 26)
+                            val second = (x % 26)
+                            val colPart = if (first > 0) {
+                                "${(64 + first).toChar()}${(65 + second).toChar()}"
+                            } else {
+                                "${(65 + second).toChar()}"
+                            }
+                            val label = "$colPart-${y + 1}"
+                            val textX = x * baseCellSize + baseCellSize / 2f
+                            val textY = y * baseCellSize + baseCellSize / 1.45f
+                            
+                            val paint = android.graphics.Paint().apply {
+                                color = android.graphics.Color.argb(20, 255, 255, 255)
+                                textSize = baseCellSize * 0.18f
+                                textAlign = android.graphics.Paint.Align.CENTER
+                                isAntiAlias = true
+                                typeface = android.graphics.Typeface.MONOSPACE
+                            }
+                            drawContext.canvas.nativeCanvas.drawText(label, textX, textY, paint)
                         }
                     }
+                }
+            }
+        }
+
+        val hoverCell = activeHoverCell
+        if (hoverCell != null && hoverCell.first in 0 until width && hoverCell.second in 0 until height) {
+            val cellType = grid[hoverCell.first][hoverCell.second].type
+            val typeDisplayName = if (cellType == ComponentType.EMPTY) {
+                "Grid Gap"
+            } else {
+                cellType.name.replace("_", " ")
+            }
+            
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = 110.dp)
+                    .background(Color(0xE6121215), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .border(1.dp, Color(0xFF00FFCC), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                val colName = if (hoverCell.first / 26 > 0) "${(64 + hoverCell.first / 26).toChar()}${(65 + hoverCell.first % 26).toChar()}" else "${(65 + hoverCell.first % 26).toChar()}"
+                val coordStr = "$colName-${hoverCell.second + 1}"
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(Color(0xFF00FFCC), shape = androidx.compose.foundation.shape.CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "SNAPPED: $coordStr ($typeDisplayName)",
+                        style = androidx.compose.ui.text.TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = Color(0xFF00FFCC)
+                        )
+                    )
                 }
             }
         }

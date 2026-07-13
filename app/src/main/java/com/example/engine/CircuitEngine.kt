@@ -39,79 +39,223 @@ class CircuitEngine {
         }
     }
 
-    private fun runScripts(grid: Array<Array<GridComponent>>, width: Int, height: Int): List<String> {
+    private fun runScripts(
+        grid: Array<Array<GridComponent>>, 
+        width: Int, 
+        height: Int,
+        ramGb: Int,
+        cores: Int,
+        clockMhz: Int
+    ): List<String> {
         val logs = mutableListOf<String>()
         val originalGrid = Array(width) { x -> Array(height) { y -> grid[x][y].copy() } }
+        
+        // 1. Calculate active external RAM from powered MEMORY_RAM blocks on the board
+        var totalAvailableRamKb = 0
+        for (gx in 0 until width) {
+            for (gy in 0 until height) {
+                val comp = grid[gx][gy]
+                if (comp.type == ComponentType.MEMORY_RAM && comp.isPowered) {
+                    val ramProps = CircuitUtils.parseProps(comp.extraData)
+                    val kb = ramProps["mem_kb"]?.toIntOrNull() ?: 1024 // Default 1024 KB
+                    totalAvailableRamKb += kb
+                }
+            }
+        }
+        
+        // 2. Count active microcontrollers and parse their specifications
+        class McuInfo(val x: Int, val y: Int, val comp: GridComponent, val lines: List<String>, val mcuMemKb: Int, val requiredRamKb: Int, val requiredCpuMhz: Int)
+        val activeMcus = mutableListOf<McuInfo>()
+        
         for (x in 0 until width) {
             for (y in 0 until height) {
                 val comp = grid[x][y]
-                if (comp.type == ComponentType.MICROCONTROLLER && comp.extraData.isNotEmpty()) {
-                    val lines = comp.extraData.split('\n')
-                    for (line in lines) {
-                        var parsedLine = line.trim()
-                        if (parsedLine.isEmpty() || parsedLine.startsWith("--") || parsedLine.startsWith("//")) continue
-                        
-                        for (p in 0..3) {
-                            if (parsedLine.contains("in($p)")) {
-                                val nx = when(p) { 0 -> x; 1 -> x + 1; 2 -> x; 3 -> x - 1; else -> -1 }
-                                val ny = when(p) { 0 -> y - 1; 1 -> y; 2 -> y + 1; 3 -> y; else -> -1 }
-                                val v = if (nx in 0 until width && ny in 0 until height && originalGrid[nx][ny].logicState) "1" else "0"
-                                parsedLine = parsedLine.replace("in($p)", v)
-                            }
-                        }
-                        
-                        var shouldExecute = true
-                        var commandPart = parsedLine
-                        
-                        if (parsedLine.startsWith("if")) {
-                            var cond = parsedLine.substringAfter("if").substringBefore("then")
-                            if (cond == parsedLine.substringAfter("if")) {
-                                cond = parsedLine.substringAfter("if").substringBefore("out")
-                            }
-                            if (cond == parsedLine.substringAfter("if")) {
-                                cond = parsedLine.substringAfter("if").substringBefore("log")
-                            }
-                            
-                            shouldExecute = evaluateCondition(cond)
-                            
-                            if (parsedLine.contains("then")) {
-                                commandPart = parsedLine.substringAfter("then").trim()
-                            } else if (parsedLine.contains("out(")) {
-                                commandPart = "out(" + parsedLine.substringAfter("out(")
-                            } else if (parsedLine.contains("log(")) {
-                                commandPart = "log(" + parsedLine.substringAfter("log(")
-                            }
-                        }
-                        
-                        if (shouldExecute) {
-                            if (commandPart.startsWith("log(")) {
-                                val msg = commandPart.substringAfter("log(").substringBeforeLast(")")
-                                logs.add("[MCU $x,$y]: $msg")
-                            } else if (commandPart.startsWith("out(")) {
-                                val outPart = commandPart.substringAfter("out(").substringBefore(")")
-                                val args = outPart.split(",")
-                                if (args.size == 2) {
-                                    val pin = args[0].trim().toIntOrNull() ?: 0
-                                    val expr = args[1].trim()
-                                    val isHigh = evaluateCondition(expr)
-                                    
-                                    val nx = when(pin) { 0 -> x; 1 -> x + 1; 2 -> x; 3 -> x - 1; else -> -1 }
-                                    val ny = when(pin) { 0 -> y - 1; 1 -> y; 2 -> y + 1; 3 -> y; else -> -1 }
-                                    
-                                    if (nx in 0 until width && ny in 0 until height) {
-                                        grid[nx][ny] = grid[nx][ny].copy(logicState = isHigh)
-                                    }
+                if (comp.type == ComponentType.MICROCONTROLLER) {
+                    // Check if power-gated: MCU must be powered in the previous step to run
+                    if (!comp.isPowered || comp.isOverloaded) {
+                        // Unpowered or melted MCU - turn off its output pins
+                        for (pin in 0..3) {
+                            val nx = when(pin) { 0 -> x; 1 -> x + 1; 2 -> x; 3 -> x - 1; else -> -1 }
+                            val ny = when(pin) { 0 -> y - 1; 1 -> y; 2 -> y + 1; 3 -> y; else -> -1 }
+                            if (nx in 0 until width && ny in 0 until height) {
+                                val adj = grid[nx][ny]
+                                if (adj.logicState) {
+                                    grid[nx][ny] = adj.copy(logicState = false)
                                 }
+                            }
+                        }
+                        continue
+                    }
+                    
+                    val lines = comp.extraData.split('\n')
+                    val firstLine = lines.firstOrNull()?.trim() ?: ""
+                    val hasProps = firstLine.contains("=") && (firstLine.contains("cores") || firstLine.contains("mhz") || firstLine.contains("mem_kb"))
+                    val props = if (hasProps) {
+                        CircuitUtils.parseProps(firstLine)
+                    } else {
+                        emptyMap()
+                    }
+                    
+                    val cleanLines = if (hasProps) lines.drop(1) else lines
+                    val scriptLines = cleanLines.filter { 
+                        val trimmed = it.trim()
+                        trimmed.isNotEmpty() && !trimmed.startsWith("--") && !trimmed.startsWith("//") 
+                    }
+                    
+                    val mcuCores = props["cores"]?.toIntOrNull() ?: 1
+                    val mcuMhz = props["mhz"]?.toIntOrNull() ?: 16
+                    val mcuMemKb = props["mem_kb"]?.toIntOrNull() ?: 1024
+                    
+                    // Memory calculation: 128KB baseline + 32KB per instruction line
+                    val requiredRam = 128 + scriptLines.size * 32
+                    // CPU calculations: 10MHz baseline + 10MHz per instruction executed
+                    val requiredCpu = (10 + scriptLines.size * 10) * mcuCores
+                    
+                    activeMcus.add(McuInfo(x, y, comp, scriptLines, mcuMemKb, requiredRamKb = requiredRam, requiredCpuMhz = requiredCpu))
+                }
+            }
+        }
+        
+        if (activeMcus.isEmpty()) return logs
+        
+        // Evaluate memory budget across the board
+        // Total board system RAM pool = Total powered external RAM + internal RAM of each active microcontroller
+        val totalBoardRamPool = totalAvailableRamKb + activeMcus.sumOf { it.mcuMemKb }
+        val totalRequiredRamPool = activeMcus.sumOf { it.requiredRamKb }
+        val isOom = totalRequiredRamPool > totalBoardRamPool
+        
+        // Evaluate physical device CPU power allocation
+        // Simulated CPU budget = cores * clockMhz (Host Emulated Budget)
+        val systemCpuBudgetMhz = cores * clockMhz
+        val totalRequiredBoardMhz = activeMcus.sumOf { it.requiredCpuMhz }
+        val isCpuOverloaded = totalRequiredBoardMhz > systemCpuBudgetMhz
+        
+        // Dynamic stability factor calculated via native Java integration
+        val stability = JavaHardwareHelper.calculateStabilityFactor(
+            totalRequiredBoardMhz,
+            systemCpuBudgetMhz,
+            totalRequiredRamPool,
+            totalBoardRamPool
+        )
+        logs.add("[System Stability]: %.1f%% (%s)".format(stability * 100.0, JavaHardwareHelper.getJavaDiagnosticStatus()))
+        
+        if (isCpuOverloaded) {
+            logs.add("[System]: CPU Overload Throttling! Required: ${totalRequiredBoardMhz}MHz > Available Pool: ${systemCpuBudgetMhz}MHz")
+        }
+        
+        for (mcu in activeMcus) {
+            val comp = mcu.comp
+            val x = mcu.x
+            val y = mcu.y
+            
+            if (isOom) {
+                logs.add("[MCU $x,$y]: ERROR: Out of Memory! (Required: ${mcu.requiredRamKb}KB, Board Pool: ${totalBoardRamPool}KB. Place and power RAM blocks!)")
+                // Fault the microcontroller visual state
+                grid[x][y] = comp.copy(isOverloaded = true)
+                continue
+            }
+            
+            // Dynamic thermal rise / dissipation modeled in Java class 
+            val tempIncrease = JavaHardwareHelper.calculateThermalIncrease(
+                mcu.lines.size,
+                1, // execution thread multiplier
+                comp.temperature,
+                isCpuOverloaded
+            )
+            val newTemp = (comp.temperature + tempIncrease).coerceIn(25f, 2500f)
+            grid[x][y] = grid[x][y].copy(temperature = newTemp)
+            
+            if (newTemp > 1200f) {
+                logs.add("[MCU $x,$y]: CRITICAL: Microcontroller Melted due to extreme thermal load! (${newTemp.toInt()}°C/1200°C max)")
+                grid[x][y] = grid[x][y].copy(isOverloaded = true, temperature = 1200f)
+                continue
+            } else if (newTemp > 150f) {
+                logs.add("[MCU $x,$y]: WARNING: High temperature! (${newTemp.toInt()}°C/1200°C max).")
+            }
+            
+            // Execute instructions within CPU performance capabilities
+            var linesToExecute = mcu.lines
+            if (isCpuOverloaded) {
+                // Proportionally throttle instruction dispatch execution rate to match the available budget
+                val throttleRatio = systemCpuBudgetMhz.toFloat() / totalRequiredBoardMhz.toFloat()
+                val executeCount = (mcu.lines.size * throttleRatio).toInt().coerceIn(1, mcu.lines.size)
+                linesToExecute = mcu.lines.take(executeCount)
+                logs.add("[MCU $x,$y]: System throttling executed only ${executeCount}/${mcu.lines.size} instructions.")
+            }
+            
+            // Execute the final allowed code lines
+            for (line in linesToExecute) {
+                var parsedLine = line.trim()
+                if (parsedLine.isEmpty() || parsedLine.startsWith("--") || parsedLine.startsWith("//")) continue
+                
+                for (p in 0..3) {
+                    if (parsedLine.contains("in($p)")) {
+                        val nx = when(p) { 0 -> x; 1 -> x + 1; 2 -> x; 3 -> x - 1; else -> -1 }
+                        val ny = when(p) { 0 -> y - 1; 1 -> y; 2 -> y + 1; 3 -> y; else -> -1 }
+                        val v = if (nx in 0 until width && ny in 0 until height && originalGrid[nx][ny].logicState) "1" else "0"
+                        parsedLine = parsedLine.replace("in($p)", v)
+                    }
+                }
+                
+                var shouldExecute = true
+                var commandPart = parsedLine
+                
+                if (parsedLine.startsWith("if")) {
+                    var cond = parsedLine.substringAfter("if").substringBefore("then")
+                    if (cond == parsedLine.substringAfter("if")) {
+                        cond = parsedLine.substringAfter("if").substringBefore("out")
+                    }
+                    if (cond == parsedLine.substringAfter("if")) {
+                        cond = parsedLine.substringAfter("if").substringBefore("log")
+                    }
+                    
+                    shouldExecute = evaluateCondition(cond)
+                    
+                    if (parsedLine.contains("then")) {
+                        commandPart = parsedLine.substringAfter("then").trim()
+                    } else if (parsedLine.contains("out(")) {
+                        commandPart = "out(" + parsedLine.substringAfter("out(")
+                    } else if (parsedLine.contains("log(")) {
+                        commandPart = "log(" + parsedLine.substringAfter("log(")
+                    }
+                }
+                
+                if (shouldExecute) {
+                    if (commandPart.startsWith("log(")) {
+                        val msg = commandPart.substringAfter("log(").substringBeforeLast(")")
+                        logs.add("[MCU $x,$y]: $msg")
+                    } else if (commandPart.startsWith("out(")) {
+                        val outPart = commandPart.substringAfter("out(").substringBefore(")")
+                        val args = outPart.split(",")
+                        if (args.size == 2) {
+                            val pin = args[0].trim().toIntOrNull() ?: 0
+                            val expr = args[1].trim()
+                            val isHigh = evaluateCondition(expr)
+                            
+                            val nx = when(pin) { 0 -> x; 1 -> x + 1; 2 -> x; 3 -> x - 1; else -> -1 }
+                            val ny = when(pin) { 0 -> y - 1; 1 -> y; 2 -> y + 1; 3 -> y; else -> -1 }
+                            
+                            if (nx in 0 until width && ny in 0 until height) {
+                                grid[nx][ny] = grid[nx][ny].copy(logicState = isHigh)
                             }
                         }
                     }
                 }
             }
         }
+        
         return logs
     }
 
-    fun calculatePower(inputGrid: Array<Array<GridComponent>>, width: Int, height: Int, tick: Long = 0, ramGb: Int = 4, cores: Int = 4): SimulationResult {
+    fun calculatePower(
+        inputGrid: Array<Array<GridComponent>>, 
+        width: Int, 
+        height: Int, 
+        tick: Long = 0, 
+        ramGb: Int = 4, 
+        cores: Int = 4,
+        clockMhz: Int = 2400
+    ): SimulationResult {
         // Deep copy of GridComponent array.
         val grid = Array(width) { x -> inputGrid[x].map { it.copy() }.toTypedArray() }
         var activeScriptsCount = 0
@@ -323,7 +467,7 @@ class CircuitEngine {
             }
         }
         
-        val logs = runScripts(grid, width, height)
+        val logs = runScripts(grid, width, height, ramGb, cores, clockMhz)
 
         val energyResult = EnergyEngine.simulateEnergyFlow(grid, width, height, activeScriptsCount)
         

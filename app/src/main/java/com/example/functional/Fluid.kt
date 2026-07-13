@@ -28,7 +28,8 @@ object Fluid {
                type == ComponentType.METHANE ||
                type == ComponentType.CARBON_DIOXIDE ||
                type == ComponentType.PLASMA ||
-               type == ComponentType.MERCURY
+               type == ComponentType.MERCURY ||
+               type == ComponentType.CORIUM
     }
 
     /**
@@ -50,7 +51,8 @@ object Fluid {
                type == ComponentType.METHANE ||
                type == ComponentType.CARBON_DIOXIDE ||
                type == ComponentType.PLASMA ||
-               type == ComponentType.MERCURY
+               type == ComponentType.MERCURY ||
+               type == ComponentType.CORIUM
     }
 
     /**
@@ -76,6 +78,7 @@ object Fluid {
      */
     fun getFlowChance(type: ComponentType): Double {
         return when (type) {
+            ComponentType.CORIUM -> 0.3 // Extremely viscous radioactive lava
             ComponentType.LAVA -> 0.4
             ComponentType.SLIME -> 0.25 // Viscous
             ComponentType.OIL -> 0.7

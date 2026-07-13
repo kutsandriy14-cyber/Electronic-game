@@ -186,6 +186,35 @@ object MaterialEngine {
                 Lava.simulate(grid, x, y, width, height)
                 heatAdjacent(grid, x, y, width, height, 80f)
             }
+
+            type == ComponentType.CORIUM -> {
+                // Radioactive decay sustains extreme temperatures (constantly stays super-hot!)
+                if (temp < 2200f) {
+                    temp += 15f
+                }
+                // Corium flows and conducts intense heat to surrounding materials
+                heatAdjacent(grid, x, y, width, height, 250f)
+                
+                // Actively corrode and melt down adjacent solid/liquid structures
+                val dxs = intArrayOf(-1, 1, 0, 0)
+                val dys = intArrayOf(0, 0, -1, 1)
+                for (i in 0..3) {
+                    val nx = x + dxs[i]
+                    val ny = y + dys[i]
+                    if (nx in 0 until width && ny in 0 until height) {
+                        val adj = grid[nx][ny]
+                        if (adj.type != ComponentType.EMPTY && adj.type != ComponentType.CORIUM && adj.type != ComponentType.BEDROCK) {
+                            if (rand() < 0.30) {
+                                if (adj.type == ComponentType.WATER || adj.type == ComponentType.INFINITE_WATER) {
+                                    grid[nx][ny] = GridComponent(ComponentType.STEAM, temperature = temp)
+                                } else {
+                                    grid[nx][ny] = GridComponent(ComponentType.CORIUM, temperature = temp - 50f)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Apply updated temperature to grid cell
