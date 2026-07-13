@@ -58,30 +58,91 @@ fun LoginScreen(
         }
 
         if (serverUrl == null && !isLoading) {
-            Button(
-                onClick = {
-                    coroutineScope.launch {
-                        isLoading = true
-                        errorMessage = "Поиск сервера NetAuth..."
-                        val url = UdpDiscovery.discoverServer(context)
-                        if (url != null) {
-                            serverUrl = url
-                            NetAuthManager.setServerUrl(url)
-                            errorMessage = null
-                        } else {
-                            errorMessage = "Сервер NetAuth не найден в локальной сети. Играйте в режиме гостя."
-                        }
-                        isLoading = false
-                    }
-                },
+            var manualIp by remember { mutableStateOf("") }
+            
+            OutlinedTextField(
+                value = manualIp,
+                onValueChange = { manualIp = it },
+                label = { Text("IP-адрес сервера (например, 192.168.1.100)") },
                 modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Повторить поиск")
+                Button(
+                    onClick = {
+                        if (manualIp.isNotBlank()) {
+                            var ip = manualIp.trim()
+                            if (!ip.startsWith("http://") && !ip.startsWith("https://")) {
+                                if (!ip.contains(":")) {
+                                    ip = "http://$ip:8080/"
+                                } else {
+                                    ip = "http://$ip/"
+                                }
+                            }
+                            serverUrl = ip
+                            NetAuthManager.setServerUrl(ip)
+                            errorMessage = null
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Подключиться")
+                }
+                OutlinedButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            isLoading = true
+                            errorMessage = "Поиск сервера NetAuth..."
+                            val url = UdpDiscovery.discoverServer(context)
+                            if (url != null) {
+                                serverUrl = url
+                                NetAuthManager.setServerUrl(url)
+                                errorMessage = null
+                            } else {
+                                errorMessage = "Сервер NetAuth не найден в локальной сети. Играйте в режиме гостя."
+                            }
+                            isLoading = false
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Повторить поиск")
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
 
         if (serverUrl != null) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Подключено к серверу:", style = MaterialTheme.typography.labelSmall)
+                        Text(serverUrl ?: "", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    TextButton(
+                        onClick = {
+                            serverUrl = null
+                            errorMessage = null
+                        }
+                    ) {
+                        Text("Сменить")
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
